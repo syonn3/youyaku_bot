@@ -18,7 +18,9 @@
       <textarea id="textInput" placeholder="ここに文章をペーストしてください"></textarea>
       <div class="file-inputs">
         <input type="url" id="urlInput" placeholder="URLを入力" />
-        <input type="file" id="pdfInput" accept="application/pdf" />
+        <!-- PDF入力はグレーアウト -->
+        <input type="file" id="pdfInput" accept="application/pdf" disabled />
+        <p style="font-size:0.9em; color:#888;">※ PDF要約は近日対応予定です</p>
       </div>
     </section>
 
@@ -59,8 +61,7 @@
     </section>
   </main>
 
-  <!-- PDF対応（1行追加） -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.js"></script>
+  <!-- アプリ本体 -->
   <script src="app.js"></script>
 </body>
 </html>

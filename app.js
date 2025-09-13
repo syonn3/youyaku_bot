@@ -37,32 +37,50 @@ clearBtn.addEventListener("click", () => {
 });
 
 /* =======================
-   PDF.js ローダ（重要）
+   PDF.js ローダ（UMD/legacy を動的読み込み）
    ======================= */
-// まず window.pdfjsLib があればそれを使う。
-// 無ければ ESM を CDN から動的 import して読み込む。
-// どちらの経路でも Worker のパスを設定する。
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    // 既に同じsrcのscriptがあればそれを使う
+    const existing = Array.from(document.getElementsByTagName("script"))
+      .find(s => s.src === src);
+    if (existing) {
+      if (window.pdfjsLib) return resolve();
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", (e) => reject(e));
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = (e) => reject(e);
+    document.head.appendChild(s);
+  });
+}
+
 async function ensurePdfjs() {
+  // すでに読み込み済み（index.html で legacy を読み込んでいるケース）
   if (window.pdfjsLib) {
     try {
       if (window.pdfjsLib.GlobalWorkerOptions) {
         window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-          "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.js";
+          "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/legacy/build/pdf.worker.min.js";
       }
     } catch (_) {}
     return window.pdfjsLib;
   }
-  // 動的ロード（ESM）
-  const mod = await import(
-    "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs"
-  );
-  if (mod && mod.GlobalWorkerOptions) {
-    mod.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.js";
+
+  // まだなら legacy UMD を動的に読み込む（ESMは使わない）
+  await loadScriptOnce("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/legacy/build/pdf.min.js");
+  if (!window.pdfjsLib) {
+    throw new Error("pdfjsLib を読み込めませんでした。");
   }
-  // グローバルにも置いておくと以後早い
-  window.pdfjsLib = mod;
-  return mod;
+  if (window.pdfjsLib.GlobalWorkerOptions) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/legacy/build/pdf.worker.min.js";
+  }
+  return window.pdfjsLib;
 }
 
 /* ========== 要約ロジック ========== */
@@ -154,9 +172,9 @@ function htmlToText(html) {
   }
 }
 
-/** PDF → テキスト */
+/** PDF → テキスト（UMD/legacy使用） */
 async function extractPdfText(file) {
-  const pdfjsLib = await ensurePdfjs(); // ← ここで必ず読み込む
+  const pdfjsLib = await ensurePdfjs(); // ← 必ずUMD/legacyを用意
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
 
@@ -186,6 +204,7 @@ async function generateSummary() {
 
     if (plain) {
       sourceText = plain;
+
     } else if (pdfFile) {
       try {
         sourceText = await extractPdfText(pdfFile);
@@ -200,6 +219,7 @@ async function generateSummary() {
           "PDFの読み取りに失敗しました。別のPDFでお試しください。";
         return;
       }
+
     } else if (url) {
       try {
         const res = await fetch(url, { mode: "cors" });
@@ -211,6 +231,7 @@ async function generateSummary() {
           "URLの本文取得に失敗しました（サイトの制限/CORSの可能性）。\n→ ページ内容をコピーしてペーストしてください。";
         return;
       }
+
     } else {
       summaryOutput.innerText =
         "入力がありません。テキストをペーストするか、URLまたはPDFを指定してください。";
@@ -224,6 +245,7 @@ async function generateSummary() {
 
     summaryOutput.innerText =
       styled || "内容が短すぎるため要約できませんでした。";
+
   } catch (err) {
     console.error(err);
     summaryOutput.innerText =
