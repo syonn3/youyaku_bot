@@ -42,6 +42,10 @@
           <option value="business">ビジネス</option>
         </select>
       </label>
+
+      <div class="buttons">
+        <button id="summarizeBtn" onclick="generateSummary()">要約する</button>
+      </div>
     </section>
 
     <!-- 出力 -->
@@ -55,6 +59,8 @@
     </section>
   </main>
 
+  <!-- PDF対応（1行追加） -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
