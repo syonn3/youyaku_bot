@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>要約Bot</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>要約Bot</h1>
+  </header>
+
+  <main>
+    <!-- 入力欄 -->
+    <section id="input-section">
+      <h2>入力</h2>
+      <textarea id="textInput" placeholder="ここに文章をペーストしてください"></textarea>
+      <div class="file-inputs">
+        <input type="url" id="urlInput" placeholder="URLを入力" />
+        <input type="file" id="pdfInput" accept="application/pdf" />
+      </div>
+    </section>
+
+    <!-- 設定 -->
+    <section id="options-section">
+      <h2>オプション</h2>
+      <label>長さ:
+        <select id="lengthSelect">
+          <option value="short">短（50–100）</option>
+          <option value="medium">中（200–400）</option>
+          <option value="long">長（600–800）</option>
+          <option value="custom">指定</option>
+        </select>
+      </label>
+      <input type="number" id="customLength" placeholder="文字数を入力" style="display:none;" />
+
+      <label>スタイル:
+        <select id="styleSelect">
+          <option value="bullet">箇条書き</option>
+          <option value="friendly">フレンドリー</option>
+          <option value="business">ビジネス</option>
+        </select>
+      </label>
+    </section>
+
+    <!-- 出力 -->
+    <section id="output-section">
+      <h2>要約結果</h2>
+      <div id="summaryOutput">ここに要約が表示されます</div>
+      <div class="buttons">
+        <button id="copyBtn">コピー</button>
+        <button id="clearBtn">クリア</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
