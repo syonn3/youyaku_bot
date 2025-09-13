@@ -18,9 +18,14 @@
       <textarea id="textInput" placeholder="ここに文章をペーストしてください"></textarea>
       <div class="file-inputs">
         <input type="url" id="urlInput" placeholder="URLを入力" />
-        <!-- PDF入力はグレーアウト -->
-        <input type="file" id="pdfInput" accept="application/pdf" disabled />
-        <p style="font-size:0.9em; color:#888;">※ PDF要約は近日対応予定です</p>
+
+        <!-- PDFはダミー表示（クリック不可／ダイアログも開かない） -->
+        <div aria-disabled="true" style="display:flex; gap:8px; align-items:center;">
+          <button type="button" style="pointer-events:none; opacity:.5; cursor:not-allowed;">
+            ファイルの選択
+          </button>
+          <span style="color:#888;">PDF要約は近日公開</span>
+        </div>
       </div>
     </section>
 
