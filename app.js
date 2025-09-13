@@ -3,7 +3,7 @@
    1) 下の PROXY_ENDPOINT に、GASをデプロイしたURLを貼る
 ================================================ */
 
-const PROXY_ENDPOINT = "<<<ここにGASデプロイURL（/exec で終わる）を貼る>>>";
+const PROXY_ENDPOINT = "https://script.google.com/macros/s/AKfycbzmc-X0WjvFLaAeoNTBEqEa7d4hjhQzWtu0RxIcVlXng1h7tN0VB_l2ZIjkwlvamP-5/exec";
 
 const qs = sel => document.querySelector(sel);
 const qsa = sel => Array.from(document.querySelectorAll(sel));
