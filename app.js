@@ -1,257 +1,210 @@
-// 要素取得
-const textInput = document.getElementById("textInput");
-const urlInput = document.getElementById("urlInput");
-const pdfInput = document.getElementById("pdfInput");
-const lengthSelect = document.getElementById("lengthSelect");
-const customLength = document.getElementById("customLength");
-const styleSelect = document.getElementById("styleSelect");
-const summaryOutput = document.getElementById("summaryOutput");
-const copyBtn = document.getElementById("copyBtn");
-const clearBtn = document.getElementById("clearBtn");
+/* ===== 要約Bot — URL安定化＋片手操作改善 =====
+   手順は1つだけ：
+   1) 下の PROXY_ENDPOINT に、GASをデプロイしたURLを貼る
+================================================ */
 
-// カスタム長さのUI切替
-lengthSelect.addEventListener("change", () => {
-  if (lengthSelect.value === "custom") {
-    customLength.style.display = "inline-block";
-    customLength.focus();
-  } else {
-    customLength.style.display = "none";
-  }
-});
+const PROXY_ENDPOINT = "<<<ここにGASデプロイURL（/exec で終わる）を貼る>>>";
 
-// コピー
-copyBtn.addEventListener("click", () => {
-  const text = summaryOutput.innerText || "";
-  if (!text.trim()) return;
-  navigator.clipboard.writeText(text).then(() => {
-    alert("要約をコピーしました");
+const qs = sel => document.querySelector(sel);
+const qsa = sel => Array.from(document.querySelectorAll(sel));
+
+const state = {
+  busy: false,
+};
+
+window.addEventListener('DOMContentLoaded', () => {
+  // タブ切替
+  qsa('.yb-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      qsa('.yb-tab').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      const tab = btn.dataset.tab;
+      qsa('.yb-panel').forEach(p => {
+        p.classList.toggle('is-hidden', p.dataset.panel !== tab);
+      });
+    });
   });
+
+  // URL→要約
+  qs('#fetchUrlBtn')?.addEventListener('click', handleUrlSummarize);
+  // ペースト→要約
+  qs('#summarizePasteBtn')?.addEventListener('click', handlePasteSummarize);
+  // 下部バー：コピー／クリア
+  qs('#copyBtn')?.addEventListener('click', copyOutput);
+  qs('#clearBtn')?.addEventListener('click', clearAll);
+
+  // PWA（任意）：サービスワーカー登録
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  }
 });
 
-// クリア
-clearBtn.addEventListener("click", () => {
-  textInput.value = "";
-  urlInput.value = "";
-  if (pdfInput) pdfInput.value = "";
-  summaryOutput.innerText = "ここに要約が表示されます";
-});
+/* ========== 共通UI ========== */
 
-/* =======================
-   PDF.js ローダ（UMD/legacy を動的読み込み）
-   ======================= */
-function loadScriptOnce(src) {
-  return new Promise((resolve, reject) => {
-    // 既に同じsrcのscriptがあればそれを使う
-    const existing = Array.from(document.getElementsByTagName("script"))
-      .find(s => s.src === src);
-    if (existing) {
-      if (window.pdfjsLib) return resolve();
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", (e) => reject(e));
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = src;
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = (e) => reject(e);
-    document.head.appendChild(s);
-  });
+function setBusy(val, msg="") {
+  state.busy = val;
+  const btns = qsa('button');
+  btns.forEach(b => b.disabled = val && !b.classList.contains('yb-btn-plain'));
+  setStatus(msg);
+}
+function setStatus(msg) {
+  qs('#status').textContent = msg || "";
 }
 
-async function ensurePdfjs() {
-  // すでに読み込み済み（index.html で legacy を読み込んでいるケース）
-  if (window.pdfjsLib) {
-    try {
-      if (window.pdfjsLib.GlobalWorkerOptions) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-          "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/legacy/build/pdf.worker.min.js";
-      }
-    } catch (_) {}
-    return window.pdfjsLib;
-  }
+function getOptions() {
+  const length = document.querySelector('input[name="length"]:checked')?.value || 'short';
+  const custom = qs('#customLength')?.value?.trim();
+  const style = document.querySelector('input[name="style"]:checked')?.value || 'friendly';
 
-  // まだなら legacy UMD を動的に読み込む（ESMは使わない）
-  await loadScriptOnce("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/legacy/build/pdf.min.js");
-  if (!window.pdfjsLib) {
-    throw new Error("pdfjsLib を読み込めませんでした。");
-  }
-  if (window.pdfjsLib.GlobalWorkerOptions) {
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/legacy/build/pdf.worker.min.js";
-  }
-  return window.pdfjsLib;
+  let targetChars = null;
+  if (length === 'custom' && custom) {
+    targetChars = Math.max(10, parseInt(custom, 10) || 0);
+  } else if (length === 'short') targetChars = 100;
+  else if (length === 'medium') targetChars = 300;
+  else if (length === 'long') targetChars = 750;
+
+  return { length, targetChars, style };
 }
 
-/* ========== 要約ロジック ========== */
+/* ========== URL処理：直→プロキシの自動切替 ========== */
 
-/** 文字数ターゲットの決定 */
-function targetLength() {
-  const map = { short: 90, medium: 300, long: 700 };
-  if (lengthSelect.value === "custom") {
-    const v = parseInt(customLength.value, 10);
-    return isNaN(v) || v <= 0 ? 200 : Math.min(2000, v);
-  }
-  return map[lengthSelect.value] || 200;
-}
+async function handleUrlSummarize() {
+  const url = qs('#urlInput').value.trim();
+  if (!url) { setStatus("URLを入力してください。"); return; }
 
-/** 文の分割（簡易） */
-function splitSentences(text) {
-  const t = text
-    .replace(/\s+/g, " ")
-    .replace(/([。．！？!?\n\r]+)/g, "$1|")
-    .split("|")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return t;
-}
-
-/** 粗い重要度順抽出 */
-function pickKeySentences(sentences, maxChars) {
-  const used = new Set();
-  const result = [];
-  let total = 0;
-
-  const scored = sentences
-    .map((s) => {
-      const len = s.length;
-      const keywordScore = (s.match(/[A-Za-z0-9一-龥]{2,}/g) || []).length;
-      const score = keywordScore - len / 200;
-      return { s, score };
-    })
-    .sort((a, b) => b.score - a.score);
-
-  for (const { s } of scored) {
-    const sig = s.replace(/\s/g, "");
-    if (used.has(sig)) continue;
-    if (total + s.length > maxChars) continue;
-    result.push(s);
-    used.add(sig);
-    total += s.length;
-    if (total >= maxChars) break;
-  }
-
-  if (result.length === 0) {
-    let buf = "";
-    for (const s of sentences) {
-      if (buf.length + s.length > maxChars) break;
-      buf += (buf ? " " : "") + s;
-    }
-    return buf ? [buf] : [];
-  }
-  return result;
-}
-
-/** 出力スタイル */
-function renderByStyle(lines, style) {
-  const joined = lines.join(" ");
-  switch (style) {
-    case "bullet":
-      return lines.map((l) => `・${l}`).join("\n");
-    case "friendly":
-      return `かんたん要約：\n${joined}\n\n（必要なら「長さ」を調整してね）`;
-    case "business":
-      return `要約（業務向け）：\n${joined}`;
-    default:
-      return joined;
-  }
-}
-
-/** HTML → テキスト */
-function htmlToText(html) {
+  setBusy(true, "取得中…");
   try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    ["script", "style", "noscript", "iframe", "nav", "footer"].forEach((sel) =>
-      doc.querySelectorAll(sel).forEach((el) => el.remove())
-    );
-    const text = doc.body ? doc.body.innerText : doc.documentElement.innerText;
-    return (text || "").replace(/\n{3,}/g, "\n\n").trim();
+    const html = await fetchWithFallback(url);
+    if (!html) throw new Error("本文の取得に失敗しました。");
+
+    // ページのテキスト抽出（超シンプル）
+    const text = extractReadableText(html).slice(0, 200000); // 安全上の上限
+    await runSummarization(text);
+  } catch (e) {
+    console.error(e);
+    setStatus("要約に失敗しました。本文を貼り付けてください。");
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function fetchWithFallback(targetUrl) {
+  // 1) 直接取得
+  try {
+    const res = await fetch(targetUrl, { mode: 'cors' });
+    if (res.ok) return await res.text();
+    // CORSやブロック系はここに来ないこともある
+  } catch (_) {
+    // ネットワーク/ CORS 例外は握りつぶして次へ
+  }
+
+  // 2) プロキシに自動切替（ユーザー操作不要）
+  if (!PROXY_ENDPOINT || PROXY_ENDPOINT.startsWith("<<<")) {
+    throw new Error("プロキシ未設定");
+  }
+  const proxied = new URL(PROXY_ENDPOINT);
+  proxied.searchParams.set("url", targetUrl);
+
+  const res2 = await fetch(proxied.toString(), { mode: 'cors' });
+  if (!res2.ok) throw new Error("プロキシ取得失敗");
+  return await res2.text();
+}
+
+/* ====== 超簡易の本文抽出（見出し＋本文テキスト優先） ====== */
+function extractReadableText(html) {
+  try {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    // 不要セクション削除
+    doc.querySelectorAll('script,style,nav,footer,form,header,aside').forEach(el=>el.remove());
+    const parts = [];
+    doc.querySelectorAll('h1,h2,h3,p,article,section,main,li').forEach(el=>{
+      const t = (el.innerText || "").trim();
+      if (t && t.length > 1) parts.push(t);
+    });
+    return parts.join('\n');
   } catch {
-    return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return html;
   }
 }
 
-/** PDF → テキスト（UMD/legacy使用） */
-async function extractPdfText(file) {
-  const pdfjsLib = await ensurePdfjs(); // ← 必ずUMD/legacyを用意
-  const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-
-  let all = "";
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const content = await page.getTextContent();
-    const strings = content.items
-      .map((it) => ("str" in it ? it.str : ""))
-      .filter(Boolean);
-    const text = strings.join(" ").replace(/\s+/g, " ").trim();
-    if (text) all += (all ? "\n" : "") + text;
-  }
-  return all.trim();
-}
-
-/** メイン：要約を生成 */
-async function generateSummary() {
-  summaryOutput.innerText = "要約中…";
-
-  const plain = (textInput.value || "").trim();
-  const pdfFile = pdfInput && pdfInput.files && pdfInput.files[0];
-  const url = (urlInput.value || "").trim();
-
+/* ========== ペースト要約 ========== */
+async function handlePasteSummarize() {
+  const text = qs('#pasteInput').value.trim();
+  if (!text) { setStatus("本文を貼り付けてください。"); return; }
+  setBusy(true, "要約中…");
   try {
-    let sourceText = "";
-
-    if (plain) {
-      sourceText = plain;
-
-    } else if (pdfFile) {
-      try {
-        sourceText = await extractPdfText(pdfFile);
-        if (!sourceText) {
-          summaryOutput.innerText =
-            "PDFから本文が取得できませんでした。スキャン画像の可能性があります。";
-          return;
-        }
-      } catch (e) {
-        console.error(e);
-        summaryOutput.innerText =
-          "PDFの読み取りに失敗しました。別のPDFでお試しください。";
-        return;
-      }
-
-    } else if (url) {
-      try {
-        const res = await fetch(url, { mode: "cors" });
-        const html = await res.text();
-        sourceText = htmlToText(html);
-        if (!sourceText) throw new Error("no text");
-      } catch (e) {
-        summaryOutput.innerText =
-          "URLの本文取得に失敗しました（サイトの制限/CORSの可能性）。\n→ ページ内容をコピーしてペーストしてください。";
-        return;
-      }
-
-    } else {
-      summaryOutput.innerText =
-        "入力がありません。テキストをペーストするか、URLまたはPDFを指定してください。";
-      return;
-    }
-
-    const maxChars = targetLength();
-    const sentences = splitSentences(sourceText);
-    const picked = pickKeySentences(sentences, maxChars);
-    const styled = renderByStyle(picked, styleSelect.value);
-
-    summaryOutput.innerText =
-      styled || "内容が短すぎるため要約できませんでした。";
-
-  } catch (err) {
-    console.error(err);
-    summaryOutput.innerText =
-      "要約に失敗しました。もう一度お試しください。";
+    await runSummarization(text);
+  } catch (e) {
+    console.error(e);
+    setStatus("要約に失敗しました。");
+  } finally {
+    setBusy(false);
   }
 }
 
-// グローバル公開（index.html の onclick から呼ぶため）
-window.generateSummary = generateSummary;
+/* ========== クリップボード／クリア ========== */
+async function copyOutput() {
+  const out = qs('#output').value;
+  if (!out) return;
+  try {
+    await navigator.clipboard.writeText(out);
+    setStatus("コピーしました。");
+  } catch {
+    setStatus("コピーに失敗しました。");
+  }
+}
+function clearAll() {
+  qs('#urlInput').value = "";
+  qs('#pasteInput').value = "";
+  qs('#output').value = "";
+  setStatus("クリアしました。");
+}
+
+/* ========== 要約呼び出し（既存エンジンに丸投げ） ========== */
+/* ここが重要：ユーザーのご要望どおり
+   「投げられた文字列を一旦全部解釈 → 要約 → 語尾などはAI生成に任せる」
+   をプロンプトで完結させる。 */
+
+function buildPrompt(sourceText, opts){
+  const { style, targetChars } = opts;
+
+  // スタイル指示（差分は控えめ。語尾はAI裁量。）
+  const styleLine =
+    style === 'bullets'  ? "・箇条書きで要点のみを列挙してください。" :
+    style === 'business' ? "丁寧だが簡潔なビジネス文体で、断定を避けつつ要点を明確にしてください。" :
+                           "フレンドリーな自然体の日本語で、やさしく簡潔にまとめてください。";
+
+  const lenLine = targetChars
+    ? `全体でおおむね ${targetChars} 文字以内に収めてください。`
+    : "長さ指定はUIの選択に従ってください。";
+
+  // ここで「まず解釈→要約」を徹底
+  return [
+    "あなたは要約アシスタントです。以下の原文をまず全体把握し、論旨・主張・根拠・結論・注意点の順で最短経路でまとめてください。",
+    "出力は必ず日本語。固有名詞や数値は保持し、推測や創作はしないでください。",
+    styleLine,
+    lenLine,
+    "語尾や表現はAIの裁量に任せます（敬語・常体は文脈に合わせて自然に）。",
+    "―― 原文ここから ――",
+    sourceText,
+    "―― 原文ここまで ――"
+  ].join("\n");
+}
+
+/* 既存の要約エンジンが window.summarize にある想定。
+   無い場合はエラーメッセージを出すだけ（安全）。*/
+async function runSummarization(sourceText){
+  const opts = getOptions();
+  const prompt = buildPrompt(sourceText, opts);
+
+  if (typeof window.summarize !== "function") {
+    qs('#output').value = "";
+    setStatus("要約エンジンが未設定です。既存のsummarize関数に接続してください。");
+    return;
+  }
+
+  setStatus("要約中…");
+  const resultText = await window.summarize(prompt, opts); // 既存実装をそのまま利用
+  qs('#output').value = (resultText || "").trim();
+  setStatus("完了");
+}
