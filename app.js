@@ -36,7 +36,36 @@ clearBtn.addEventListener("click", () => {
   summaryOutput.innerText = "ここに要約が表示されます";
 });
 
-// ====== 要約処理 ======
+/* =======================
+   PDF.js ローダ（重要）
+   ======================= */
+// まず window.pdfjsLib があればそれを使う。
+// 無ければ ESM を CDN から動的 import して読み込む。
+// どちらの経路でも Worker のパスを設定する。
+async function ensurePdfjs() {
+  if (window.pdfjsLib) {
+    try {
+      if (window.pdfjsLib.GlobalWorkerOptions) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.js";
+      }
+    } catch (_) {}
+    return window.pdfjsLib;
+  }
+  // 動的ロード（ESM）
+  const mod = await import(
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs"
+  );
+  if (mod && mod.GlobalWorkerOptions) {
+    mod.GlobalWorkerOptions.workerSrc =
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.js";
+  }
+  // グローバルにも置いておくと以後早い
+  window.pdfjsLib = mod;
+  return mod;
+}
+
+/* ========== 要約ロジック ========== */
 
 /** 文字数ターゲットの決定 */
 function targetLength() {
@@ -54,7 +83,7 @@ function splitSentences(text) {
     .replace(/\s+/g, " ")
     .replace(/([。．！？!?\n\r]+)/g, "$1|")
     .split("|")
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
   return t;
 }
@@ -65,12 +94,14 @@ function pickKeySentences(sentences, maxChars) {
   const result = [];
   let total = 0;
 
-  const scored = sentences.map(s => {
-    const len = s.length;
-    const keywordScore = (s.match(/[A-Za-z0-9一-龥]{2,}/g) || []).length;
-    const score = keywordScore - len / 200;
-    return { s, score };
-  }).sort((a, b) => b.score - a.score);
+  const scored = sentences
+    .map((s) => {
+      const len = s.length;
+      const keywordScore = (s.match(/[A-Za-z0-9一-龥]{2,}/g) || []).length;
+      const score = keywordScore - len / 200;
+      return { s, score };
+    })
+    .sort((a, b) => b.score - a.score);
 
   for (const { s } of scored) {
     const sig = s.replace(/\s/g, "");
@@ -98,7 +129,7 @@ function renderByStyle(lines, style) {
   const joined = lines.join(" ");
   switch (style) {
     case "bullet":
-      return lines.map(l => `・${l}`).join("\n");
+      return lines.map((l) => `・${l}`).join("\n");
     case "friendly":
       return `かんたん要約：\n${joined}\n\n（必要なら「長さ」を調整してね）`;
     case "business":
@@ -113,8 +144,8 @@ function htmlToText(html) {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
-    ["script","style","noscript","iframe","nav","footer"].forEach(sel =>
-      doc.querySelectorAll(sel).forEach(el => el.remove())
+    ["script", "style", "noscript", "iframe", "nav", "footer"].forEach((sel) =>
+      doc.querySelectorAll(sel).forEach((el) => el.remove())
     );
     const text = doc.body ? doc.body.innerText : doc.documentElement.innerText;
     return (text || "").replace(/\n{3,}/g, "\n\n").trim();
@@ -123,18 +154,19 @@ function htmlToText(html) {
   }
 }
 
-/** PDF → テキスト（PDF.js 使用） */
+/** PDF → テキスト */
 async function extractPdfText(file) {
-  // 読み込み
+  const pdfjsLib = await ensurePdfjs(); // ← ここで必ず読み込む
   const buf = await file.arrayBuffer();
-  // Worker不要の組込みビルドを利用（CDN読み込み済み）
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
 
   let all = "";
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    const strings = content.items.map(it => ("str" in it ? it.str : "")).filter(Boolean);
+    const strings = content.items
+      .map((it) => ("str" in it ? it.str : ""))
+      .filter(Boolean);
     const text = strings.join(" ").replace(/\s+/g, " ").trim();
     if (text) all += (all ? "\n" : "") + text;
   }
@@ -154,20 +186,20 @@ async function generateSummary() {
 
     if (plain) {
       sourceText = plain;
-
     } else if (pdfFile) {
       try {
         sourceText = await extractPdfText(pdfFile);
         if (!sourceText) {
-          summaryOutput.innerText = "PDFから本文が取得できませんでした。スキャン画像の可能性があります。";
+          summaryOutput.innerText =
+            "PDFから本文が取得できませんでした。スキャン画像の可能性があります。";
           return;
         }
       } catch (e) {
         console.error(e);
-        summaryOutput.innerText = "PDFの読み取りに失敗しました。別のPDFでお試しください。";
+        summaryOutput.innerText =
+          "PDFの読み取りに失敗しました。別のPDFでお試しください。";
         return;
       }
-
     } else if (url) {
       try {
         const res = await fetch(url, { mode: "cors" });
@@ -179,9 +211,9 @@ async function generateSummary() {
           "URLの本文取得に失敗しました（サイトの制限/CORSの可能性）。\n→ ページ内容をコピーしてペーストしてください。";
         return;
       }
-
     } else {
-      summaryOutput.innerText = "入力がありません。テキストをペーストするか、URLまたはPDFを指定してください。";
+      summaryOutput.innerText =
+        "入力がありません。テキストをペーストするか、URLまたはPDFを指定してください。";
       return;
     }
 
@@ -190,11 +222,12 @@ async function generateSummary() {
     const picked = pickKeySentences(sentences, maxChars);
     const styled = renderByStyle(picked, styleSelect.value);
 
-    summaryOutput.innerText = styled || "内容が短すぎるため要約できませんでした。";
-
+    summaryOutput.innerText =
+      styled || "内容が短すぎるため要約できませんでした。";
   } catch (err) {
     console.error(err);
-    summaryOutput.innerText = "要約に失敗しました。もう一度お試しください。";
+    summaryOutput.innerText =
+      "要約に失敗しました。もう一度お試しください。";
   }
 }
 
