@@ -2,30 +2,99 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>要約Bot</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";margin:0;background:#0b1220;color:#e8ecf1}
-    header{padding:16px 20px;border-bottom:1px solid #1f2a44}
-    h1{margin:0;font-size:18px}
-    main{max-width:860px;margin:0 auto;padding:16px}
-    .tabs{display:flex;gap:8px;margin-bottom:12px}
-    .tab{padding:8px 12px;border:1px solid #21304f;border-radius:8px;cursor:pointer;background:#101a33}
-    .tab.active{background:#1b2a4b;border-color:#395a9e}
-    .card{background:#0f1a33;border:1px solid #182647;border-radius:12px;padding:12px;margin-bottom:12px}
-    label{display:block;margin:8px 0 6px 2px;font-size:13px;color:#b9c6d3}
-    textarea,input[type="text"],input[type="url"],select{width:100%;box-sizing:border-box;background:#0b162e;border:1px solid #21304f;border-radius:8px;color:#e8ecf1;padding:10px}
-    .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+    :root{
+      --bg:#0b1220; --surface:#0f1a33; --surface-2:#0b162e;
+      --border:#1c2a4a; --text:#e8ecf1; --muted:#9fb1c7;
+      --accent:#2a5bd7; --accent-2:#5b86ff; --ring:rgba(90,130,255,.45);
+      --ok:#7ddc8d; --err:#ff7a7a;
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+      -webkit-tap-highlight-color:transparent;
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter: saturate(1.2) blur(6px);
+      background:linear-gradient(180deg, rgba(11,18,32,.9), rgba(11,18,32,.6));
+      border-bottom:1px solid var(--border);
+      padding:16px 20px;
+    }
+    h1{margin:0; font-size:18px; letter-spacing:.2px}
+    .sub{margin:2px 0 0; font-size:12px; color:var(--muted)}
+    main{max-width:900px; margin:0 auto; padding:16px; padding-bottom:28vh;}
+    .tabs{display:flex; gap:8px; margin:12px 0 14px}
+    .tab{
+      padding:8px 14px; border:1px solid var(--border); border-radius:999px;
+      cursor:pointer; background:var(--surface-2); color:var(--text); user-select:none;
+    }
+    .tab.active{ background:linear-gradient(180deg,#1b2a4b,#142243); border-color:#37569a; }
+    .card{
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); padding:14px; margin-bottom:14px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.02) inset, 0 10px 24px rgba(0,0,0,.25);
+    }
+    label{display:block; margin:8px 0 6px 2px; font-size:13px; color:var(--muted)}
+    textarea,input[type="text"],input[type="url"],select{
+      width:100%; background:var(--surface-2); border:1px solid var(--border);
+      border-radius:12px; color:var(--text); padding:12px; font-size:16px; /* iOSズーム防止 */
+      outline:none; transition:border-color .15s, box-shadow .15s;
+    }
+    textarea{min-height:220px; resize:vertical}
+    textarea:focus, input:focus, select:focus{
+      border-color:var(--accent-2); box-shadow:0 0 0 3px var(--ring);
+    }
+    .muted{color:var(--muted); font-size:12px}
+    .row{display:flex; flex-wrap:wrap; gap:12px; align-items:center}
     .row > *{margin:4px 0}
-    .muted{color:#89a1b5;font-size:12px}
-    button{background:#2a5bd7;border:none;color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    pre{white-space:pre-wrap;word-break:break-word;background:#0b162e;border:1px solid #21304f;border-radius:12px;padding:12px}
-    .status{min-height:20px;color:#9ec1ff}
+    select{min-width:200px}
+    button{
+      background:linear-gradient(180deg,var(--accent),#1f4fc0);
+      border:none; color:#fff; padding:12px 18px; border-radius:12px;
+      font-weight:700; font-size:16px; cursor:pointer;
+      box-shadow:0 10px 18px rgba(42,91,215,.28);
+    }
+    button:disabled{opacity:.65; cursor:not-allowed; filter:grayscale(.2)}
+    .btn-ghost{
+      background:transparent; border:1px solid var(--border); color:var(--text);
+      box-shadow:none;
+    }
+    pre{
+      white-space:pre-wrap; word-break:break-word;
+      background:var(--surface-2); border:1px solid var(--border);
+      border-radius:var(--radius); padding:14px; min-height:120px;
+    }
+    .status{min-height:22px; color:#9ec1ff; display:flex; align-items:center; gap:8px}
+    .dot{width:10px; height:10px; border-radius:50%; background:var(--accent); display:none}
+    .loading .dot{display:inline-block; animation:pulse 1s ease-in-out infinite}
+    @keyframes pulse{0%{transform:scale(.9);opacity:.6}50%{transform:scale(1);opacity:1}100%{transform:scale(.9);opacity:.6}}
+    .actions{
+      position:sticky; bottom:12px; z-index:5; display:flex; gap:8px; align-items:center; justify-content:flex-end;
+      margin-top:8px; padding:8px; border:1px solid var(--border); border-radius:12px;
+      background:linear-gradient(180deg, rgba(15,26,51,.95), rgba(15,26,51,.85));
+      backdrop-filter: blur(6px);
+    }
+    .copy-bar{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:10px}
+    .copy-bar button{padding:8px 12px; font-size:14px}
+    @media (max-width:480px){
+      select{min-width:unset}
+      .actions{bottom:10px}
+      button{width:100%}
+    }
   </style>
 </head>
 <body>
-  <header><h1>要約Bot</h1></header>
+  <header>
+    <h1>要約Bot</h1>
+    <div class="sub">URLまたは本文を入れて、読みやすい要約を作ります</div>
+  </header>
+
   <main>
     <div class="tabs">
       <div id="tab-paste" class="tab active" onclick="setTab('paste')">ペースト要約</div>
@@ -34,13 +103,13 @@
 
     <div class="card" id="pane-paste">
       <label for="inp-text">本文をペースト</label>
-      <textarea id="inp-text" rows="8" placeholder="ここに本文を貼り付け"></textarea>
+      <textarea id="inp-text" rows="10" placeholder="ここに本文を貼り付けてください"></textarea>
     </div>
 
     <div class="card" id="pane-url" style="display:none">
       <label for="inp-url">URL</label>
       <input id="inp-url" type="url" placeholder="https://example.com/..." />
-      <div class="muted">※ 取得できないサイトもあります。失敗時は本文をペーストしてください。</div>
+      <div class="muted">※ 取得できないサイトもあります。失敗する場合は本文をペーストしてください。</div>
     </div>
 
     <div class="card">
@@ -56,28 +125,39 @@
         <div>
           <label>スタイル</label>
           <select id="style">
-            <option value="business" selected>ビジネス（敬体）</option>
-            <option value="bullet">箇条書き（敬体）</option>
+            <option value="business" selected>ビジネス</option>
+            <option value="bullet">箇条書き</option>
           </select>
         </div>
         <div style="margin-left:auto">
           <label>&nbsp;</label><br>
-          <button id="btn-go" onclick="summarize()">要約する</button>
+          <div class="actions">
+            <button id="btn-go" onclick="summarize()">要約する</button>
+            <button class="btn-ghost" onclick="clearAll()">クリア</button>
+          </div>
         </div>
       </div>
-      <div class="status" id="status"></div>
+
+      <div class="status" id="status"><span class="dot"></span><span id="status-text"></span></div>
       <pre id="out"></pre>
+      <div class="copy-bar">
+        <small class="muted">結果をコピーできます</small>
+        <div style="display:flex; gap:8px">
+          <button class="btn-ghost" onclick="copyOut()">コピー</button>
+        </div>
+      </div>
     </div>
   </main>
 
   <script>
-    // あなたのGAS /exec
+    // ★ あなたのGAS /exec
     const PROXY_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwoRrhGWPUV74cOzYA9NzMD8n212iVWMMIP3AONo3WlTmtt7oD-YFPRdCJ75b4j90g/exec';
 
     const $ = (s)=>document.querySelector(s);
     const tabPaste = $('#tab-paste'), tabUrl = $('#tab-url');
     const panePaste = $('#pane-paste'), paneUrl = $('#pane-url');
-    const out = $('#out'), statusEl = $('#status'), btn = $('#btn-go');
+    const out = $('#out'), statusWrap = $('#status'), statusText = $('#status-text');
+    const btn = $('#btn-go');
 
     function setTab(name){
       const isPaste = name==='paste';
@@ -92,9 +172,14 @@
       if(last==='url') setTab('url');
     })();
 
+    function setLoading(on){
+      statusWrap.classList.toggle('loading', on);
+      statusText.textContent = on ? '要約中…' : '完了';
+    }
+
     async function summarize(){
       try{
-        out.textContent=''; statusEl.textContent='要約中…'; btn.disabled=true;
+        out.textContent=''; setLoading(true); btn.disabled=true; statusText.textContent='要約中…';
 
         const mode = tabPaste.classList.contains('active') ? 'paste' : 'url';
         const text = $('#inp-text').value.trim();
@@ -120,13 +205,30 @@
 
         if(!data.ok) throw new Error(data.error || '要約に失敗しました');
         out.textContent = data.summary || '';
-        statusEl.textContent = '完了';
+        setLoading(false);
       }catch(err){
-        statusEl.textContent = 'エラー: ' + err.message;
+        statusWrap.classList.remove('loading');
+        statusText.textContent = 'エラー: ' + err.message;
         out.textContent = '要約に失敗しました。やり直してください。';
       }finally{
         btn.disabled=false;
       }
+    }
+
+    function copyOut(){
+      const txt = out.textContent || '';
+      if(!txt){ statusText.textContent = 'コピーする内容がありません'; return; }
+      if(navigator.clipboard){
+        navigator.clipboard.writeText(txt).then(()=>{ statusText.textContent='コピーしました'; });
+      }else{
+        const ta=document.createElement('textarea');
+        ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        statusText.textContent='コピーしました';
+      }
+    }
+
+    function clearAll(){
+      $('#inp-text').value=''; $('#inp-url').value=''; out.textContent=''; statusText.textContent='';
     }
   </script>
 </body>
