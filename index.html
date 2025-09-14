@@ -1,179 +1,136 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>要約Bot</title>
-  <meta name="theme-color" content="#111111" />
   <style>
-    :root { --bg:#0b0b0f; --fg:#e9ecf1; --muted:#9aa3af; --acc:#2ea043; --bd:#2b2f36; }
-    *{box-sizing:border-box}
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"}
-    header{position:sticky;top:0;background:#0d0f13;border-bottom:1px solid var(--bd);padding:12px 16px;z-index:10}
-    header h1{margin:0;font-size:18px}
-    main{max-width:920px;margin:0 auto;padding:12px}
-    .tabs{display:flex;gap:8px;margin:8px 0 12px}
-    .tabs button{flex:1;padding:10px 12px;border:1px solid var(--bd);background:#12141a;color:var(--fg);border-radius:10px;cursor:pointer}
-    .tabs button.active{border-color:var(--acc);outline:2px solid #214f2c;background:#101814}
-    .card{border:1px solid var(--bd);border-radius:14px;background:#0f1217;padding:12px}
-    textarea,input,select{width:100%;border:1px solid var(--bd);background:#0c0f14;color:var(--fg);border-radius:10px;padding:10px}
-    textarea{min-height:180px;resize:vertical}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-    .muted{color:var(--muted);font-size:12px}
-    .btns{display:flex;gap:8px;flex-wrap:wrap}
-    .btn{padding:10px 14px;border:1px solid var(--bd);background:#151923;color:var(--fg);border-radius:10px;cursor:pointer}
-    .btn.primary{background:var(--acc);border-color:#1f883d;color:#fff}
-    .btn.ghost{background:transparent}
-    .result{min-height:160px;white-space:pre-wrap;border:1px dashed var(--bd);padding:12px;border-radius:12px;background:#0b0e12}
-    .hidden{display:none}
-    @media (max-width:600px){
-      main{padding:10px}
-      .row,.row3{grid-template-columns:1fr}
-      .btns{position:sticky;bottom:8px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.35));padding-top:6px}
-    }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";margin:0;background:#0b1220;color:#e8ecf1}
+    header{padding:16px 20px;border-bottom:1px solid #1f2a44}
+    h1{margin:0;font-size:18px}
+    main{max-width:860px;margin:0 auto;padding:16px}
+    .tabs{display:flex;gap:8px;margin-bottom:12px}
+    .tab{padding:8px 12px;border:1px solid #21304f;border-radius:8px;cursor:pointer;background:#101a33}
+    .tab.active{background:#1b2a4b;border-color:#395a9e}
+    .card{background:#0f1a33;border:1px solid #182647;border-radius:12px;padding:12px;margin-bottom:12px}
+    label{display:block;margin:8px 0 6px 2px;font-size:13px;color:#b9c6d3}
+    textarea,input[type="text"]{width:100%;box-sizing:border-box;background:#0b162e;border:1px solid #21304f;border-radius:8px;color:#e8ecf1;padding:10px}
+    input[type="url"]{width:100%;box-sizing:border-box;background:#0b162e;border:1px solid #21304f;border-radius:8px;color:#e8ecf1;padding:10px}
+    select{background:#0b162e;border:1px solid #21304f;border-radius:8px;color:#e8ecf1;padding:8px}
+    .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+    .row > *{margin:4px 0}
+    .muted{color:#89a1b5;font-size:12px}
+    button{background:#2a5bd7;border:none;color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    pre{white-space:pre-wrap;word-break:break-word;background:#0b162e;border:1px solid #21304f;border-radius:12px;padding:12px}
+    .status{min-height:20px;color:#9ec1ff}
   </style>
 </head>
 <body>
-<header><h1>要約Bot</h1></header>
-<main>
-  <div class="tabs" role="tablist" aria-label="入力方式">
-    <button id="tab-paste" class="active" role="tab" aria-selected="true">ペースト</button>
-    <button id="tab-url" role="tab" aria-selected="false">URL</button>
-    <button id="tab-pdf" role="tab" aria-selected="false" disabled title="PDFは近日対応">PDF（近日）</button>
-  </div>
+  <header><h1>要約Bot</h1></header>
+  <main>
+    <div class="tabs">
+      <div id="tab-paste" class="tab active" onclick="setTab('paste')">ペースト要約</div>
+      <div id="tab-url" class="tab" onclick="setTab('url')">URL要約</div>
+    </div>
 
-  <section id="pane-paste" class="card" role="tabpanel" aria-labelledby="tab-paste">
-    <label class="muted">本文を貼り付け</label>
-    <textarea id="inp-text" placeholder="https://script.google.com/macros/s/AKfycbwoRrhGWPUV74cOzYA9NzMD8n212iVWMMIP3AONo3WlTmtt7oD-YFPRdCJ75b4j90g/exec"></textarea>
-  </section>
+    <div class="card" id="pane-paste">
+      <label for="inp-text">本文をペースト</label>
+      <textarea id="inp-text" rows="8" placeholder="ここに本文を貼り付け"></textarea>
+    </div>
 
-  <section id="pane-url" class="card hidden" role="tabpanel" aria-labelledby="tab-url">
-    <label class="muted">要約したいページのURL</label>
-    <input id="inp-url" type="url" placeholder="https://example.com/article" />
-    <p class="muted">※ 直接取得できないサイトは要約に失敗します。その場合は本文をペーストしてください。</p>
-  </section>
+    <div class="card" id="pane-url" style="display:none">
+      <label for="inp-url">URL</label>
+      <input id="inp-url" type="url" placeholder="https://example.com/..." />
+      <div class="muted">※ 取得できないサイトもあります。失敗時は本文をペーストしてください。</div>
+    </div>
 
-  <section class="card" style="margin-top:12px">
-    <div class="row">
-      <div>
-        <label class="muted">長さ</label>
-        <div class="row3">
-          <label><input type="radio" name="len" value="short" checked /> 短（50–100）</label>
-          <label><input type="radio" name="len" value="medium" /> 中（200–400）</label>
-          <label><input type="radio" name="len" value="long" /> 長（600–800）</label>
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>長さ</label>
+          <label><input type="radio" name="len" value="short"> 短</label>
+          <label><input type="radio" name="len" value="medium" checked> 中</label>
+          <label><input type="radio" name="len" value="long"> 長</label>
+          <label><input type="radio" name="len" value="custom"> 指定</label>
+          <input id="len-custom" type="text" placeholder="文字数（例 300）" style="width:120px">
         </div>
-        <div style="margin-top:8px">
-          <label><input type="radio" name="len" value="custom" /> 指定：</label>
-          <input id="len-custom" type="number" min="30" step="10" placeholder="任意の文字数" />
+        <div>
+          <label>スタイル</label>
+          <select id="style">
+            <option value="business" selected>ビジネス（だ・である）</option>
+            <option value="bullet">箇条書き</option>
+          </select>
+        </div>
+        <div style="margin-left:auto">
+          <label>&nbsp;</label><br>
+          <button id="btn-go" onclick="summarize()">要約する</button>
         </div>
       </div>
-      <div>
-        <label class="muted">スタイル</label>
-        <select id="style">
-          <option value="bullet">箇条書き</option>
-          <option value="friendly">フレンドリー</option>
-          <option value="business">ビジネス</option>
-        </select>
-      </div>
+      <div class="status" id="status"></div>
+      <pre id="out"></pre>
     </div>
-  </section>
+  </main>
 
-  <section class="card" style="margin-top:12px">
-    <div class="btns">
-      <button id="btn-sum" class="btn primary">要約する</button>
-      <button id="btn-copy" class="btn">コピー</button>
-      <button id="btn-clear" class="btn ghost">クリア</button>
-    </div>
-    <div id="status" class="muted" style="margin-top:8px"></div>
-    <div id="out" class="result" style="margin-top:10px"></div>
-  </section>
+  <script>
+    // ★あなたのGAS /exec を設定（あなたの現在のURLを既に反映済み）
+    const PROXY_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwoRrhGWPUV74cOzYA9NzMD8n212iVWMMIP3AONo3WlTmtt7oD-YFPRdCJ75b4j90g/exec';
 
-  <p class="muted" style="margin:14px 4px 0">© 3WA Lab – PDF要約は一時停止中</p>
-</main>
+    const $ = (s)=>document.querySelector(s);
+    const tabPaste = $('#tab-paste'), tabUrl = $('#tab-url');
+    const panePaste = $('#pane-paste'), paneUrl = $('#pane-url');
+    const out = $('#out'), statusEl = $('#status'), btn = $('#btn-go');
 
-<script>
-  const PROXY_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwoRrhGWPUV74cOzYA9NzMD8n212iVWMMIP3AONo3WlTmtt7oD-YFPRdCJ75b4j90g/exec';
+    function setTab(name){
+      const isPaste = name==='paste';
+      tabPaste.classList.toggle('active', isPaste);
+      tabUrl.classList.toggle('active', !isPaste);
+      panePaste.style.display = isPaste ? '' : 'none';
+      paneUrl.style.display = isPaste ? 'none' : '';
+      localStorage.setItem('yb:lastTab', name);
+    }
+    (function initTab(){
+      const last = localStorage.getItem('yb:lastTab');
+      if(last==='url') setTab('url');
+    })();
 
-  const $ = s => document.querySelector(s);
-  const tabPaste = $('#tab-paste'), tabUrl = $('#tab-url');
-  const panePaste = $('#pane-paste'), paneUrl = $('#pane-url');
+    async function summarize(){
+      try{
+        out.textContent=''; statusEl.textContent='要約中…'; btn.disabled=true;
 
-  const setTab = (name)=>{
-    const paste = name==='paste';
-    tabPaste.classList.toggle('active', paste);
-    tabPaste.setAttribute('aria-selected', paste);
-    panePaste.classList.toggle('hidden', !paste);
+        const mode = tabPaste.classList.contains('active') ? 'paste' : 'url';
+        const text = $('#inp-text').value.trim();
+        const url  = $('#inp-url').value.trim();
+        if(mode==='paste' && !text) throw new Error('本文を入れてください');
+        if(mode==='url'   && !url)  throw new Error('URLを入れてください');
 
-    tabUrl.classList.toggle('active', !paste);
-    tabUrl.setAttribute('aria-selected', !paste);
-    paneUrl.classList.toggle('hidden', paste);
-    localStorage.setItem('yb:lastTab', name);
-  };
-  tabPaste.onclick=()=>setTab('paste');
-  tabUrl.onclick=()=>setTab('url');
-  setTab(localStorage.getItem('yb:lastTab')||'paste');
+        const len = [...document.querySelectorAll('input[name=len]')].find(r=>r.checked).value;
+        const custom = $('#len-custom').value.trim();
+        const style = $('#style').value; // business / bullet
 
-  const btn = $('#btn-sum'), btnCopy = $('#btn-copy'), btnClear=$('#btn-clear');
-  const out = $('#out'), statusEl = $('#status');
+        const form = new URLSearchParams();
+        form.append('mode', mode);
+        if(text) form.append('text', text);
+        if(url)  form.append('url', url);
+        form.append('length', len);
+        if(custom) form.append('customChars', custom);
+        form.append('style', style);
 
-  async function summarize(){
-    try{
-      out.textContent=''; statusEl.textContent='要約中…';
-      btn.disabled=true;
+        const res = await fetch(PROXY_ENDPOINT, { method:'POST', body:form });
+        const raw = await res.text();
+        let data;
+        try { data = JSON.parse(raw); } catch(e){ throw new Error('サーバ応答が不正です'); }
 
-      const mode = tabPaste.classList.contains('active') ? 'paste' : 'url';
-      const text = $('#inp-text').value.trim();
-      const url  = $('#inp-url').value.trim();
-      if(mode==='paste' && !text) throw new Error('本文が空です');
-      if(mode==='url'   && !url)  throw new Error('URLを入力してください');
-
-      const len = [...document.querySelectorAll('input[name=len]')].find(r=>r.checked).value;
-      const custom = $('#len-custom').value.trim();
-      const style = $('#style').value;
-
-      // フォーム送信（ここがポイント）
-      const form = new URLSearchParams();
-      form.append('mode', mode);
-      if (text) form.append('text', text);
-      if (url)  form.append('url', url);
-      form.append('length', len);
-      if (custom) form.append('customChars', custom);
-      form.append('style', style);
-
-      const res = await fetch(PROXY_ENDPOINT, { method: 'POST', body: form });
-const raw = await res.text(); console.log(raw); const data = JSON.parse(raw);
-
-
-      if(data.ok){
+        if(!data.ok) throw new Error(data.error || '要約に失敗しました');
         out.textContent = data.summary || '';
         statusEl.textContent = '完了';
-      }else{
-        throw new Error(data.error || '要約に失敗しました');
+      }catch(err){
+        statusEl.textContent = 'エラー: ' + err.message;
+        out.textContent = '要約に失敗しました。やり直してください。';
+      }finally{
+        btn.disabled=false;
       }
-    }catch(err){
-      statusEl.textContent = '失敗: ' + err.message;
-      out.textContent = '要約に失敗しました。本文をペーストして再試行してください。';
-    }finally{
-      btn.disabled=false;
     }
-  }
-
-  btn.onclick = summarize;
-
-  btnCopy.onclick = async ()=>{
-    const t = out.textContent.trim();
-    if(!t){ statusEl.textContent='コピーする内容がありません'; return; }
-    await navigator.clipboard.writeText(t);
-    statusEl.textContent='コピーしました';
-    setTimeout(()=>statusEl.textContent='',1500);
-  };
-
-  btnClear.onclick = ()=>{
-    $('#inp-text').value='';
-    $('#inp-url').value='';
-    out.textContent=''; statusEl.textContent='';
-  };
-</script>
+  </script>
 </body>
 </html>
