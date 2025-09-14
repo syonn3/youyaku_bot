@@ -4,86 +4,184 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>要約Bot</title>
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css" />
   <meta name="theme-color" content="#111111" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    :root { --bg:#0b0b0f; --fg:#e9ecf1; --muted:#9aa3af; --acc:#2ea043; --bd:#2b2f36; }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"}
+    header{position:sticky;top:0;background:#0d0f13;border-bottom:1px solid var(--bd);padding:12px 16px;z-index:10}
+    header h1{margin:0;font-size:18px}
+    main{max-width:920px;margin:0 auto;padding:12px}
+    .tabs{display:flex;gap:8px;margin:8px 0 12px}
+    .tabs button{flex:1;padding:10px 12px;border:1px solid var(--bd);background:#12141a;color:var(--fg);border-radius:10px;cursor:pointer}
+    .tabs button.active{border-color:var(--acc);outline:2px solid #214f2c;background:#101814}
+    .card{border:1px solid var(--bd);border-radius:14px;background:#0f1217;padding:12px}
+    textarea,input,select{width:100%;border:1px solid var(--bd);background:#0c0f14;color:var(--fg);border-radius:10px;padding:10px}
+    textarea{min-height:180px;resize:vertical}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    .muted{color:var(--muted);font-size:12px}
+    .btns{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{padding:10px 14px;border:1px solid var(--bd);background:#151923;color:var(--fg);border-radius:10px;cursor:pointer}
+    .btn.primary{background:var(--acc);border-color:#1f883d;color:#fff}
+    .btn.ghost{background:transparent}
+    .result{min-height:160px;white-space:pre-wrap;border:1px dashed var(--bd);padding:12px;border-radius:12px;background:#0b0e12}
+    .hidden{display:none}
+    /* iPhone片手向け */
+    @media (max-width:600px){
+      main{padding:10px}
+      .row,.row3{grid-template-columns:1fr}
+      .btns{position:sticky;bottom:8px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.35));padding-top:6px}
+    }
+  </style>
 </head>
 <body>
-  <header class="yb-header">
-    <h1>要約Bot</h1>
-  </header>
-
-  <main class="yb-container" id="app">
-    <!-- 入力切替タブ -->
-    <nav class="yb-tabs" role="tablist" aria-label="入力方式">
-      <button class="yb-tab is-active" data-tab="url" aria-selected="true">URL</button>
-      <button class="yb-tab" data-tab="paste" aria-selected="false">ペースト</button>
-      <button class="yb-tab" data-tab="pdf" aria-selected="false">PDF（近日公開）</button>
-    </nav>
-
-
-    <!-- URL入力 -->
-    <section class="yb-panel" data-panel="url">
-      <label class="yb-label">要約したいページのURL</label>
-      <div class="yb-row">
-        <input id="urlInput" class="yb-input" type="url" placeholder="https://example.com/article" inputmode="url" />
-        <button id="fetchUrlBtn" class="yb-btn">取得→要約</button>
-      </div>
-      <p class="yb-note">※ まず直接取得を試行し、失敗時は自動でプロキシ経由に切替。</p>
-    </section>
-
-    <!-- ペースト入力 -->
-    <section class="yb-panel is-hidden" data-panel="paste">
-      <label class="yb-label">本文を貼り付け</label>
-      <textarea id="pasteInput" class="yb-textarea" rows="10" placeholder="ここに本文を貼り付けてください"></textarea>
-      <div class="yb-row">
-        <button id="summarizePasteBtn" class="yb-btn">要約する</button>
-      </div>
-    </section>
-
-    <!-- PDF（ダミー表示） -->
-    <section class="yb-panel is-hidden" data-panel="pdf">
-      <div class="yb-pdf-dummy">
-        <div class="yb-pdf-badge">近日公開</div>
-        <p>PDF要約は準備中です。URLまたはペーストをご利用ください。</p>
-      </div>
-    </section>
-
-    <!-- オプション -->
-    <section class="yb-options">
-      <fieldset class="yb-fieldset">
-        <legend>長さ</legend>
-        <label><input type="radio" name="length" value="short" checked> 短（50–100）</label>
-        <label><input type="radio" name="length" value="medium"> 中（200–400）</label>
-        <label><input type="radio" name="length" value="long"> 長（600–800）</label>
-        <label class="yb-inline">
-          <input type="radio" name="length" value="custom"> 指定
-          <input id="customLength" class="yb-input yb-inline-input" type="number" min="10" step="10" placeholder="文字数">
-        </label>
-      </fieldset>
-
-      <fieldset class="yb-fieldset">
-        <legend>スタイル</legend>
-        <label><input type="radio" name="style" value="bullets"> 箇条書き</label>
-        <label><input type="radio" name="style" value="friendly" checked> フレンドリー</label>
-        <label><input type="radio" name="style" value="business"> ビジネス</label>
-      </fieldset>
-    </section>
-
-    <!-- 出力 -->
-    <section>
-      <label class="yb-label">要約結果（日本語）</label>
-      <textarea id="output" class="yb-textarea yb-output" rows="12" readonly placeholder="ここに要約が表示されます"></textarea>
-      <div id="status" class="yb-status" aria-live="polite"></div>
-    </section>
-  </main>
-
-  <!-- 親指リーチ：下部固定バー -->
-  <div class="yb-actionbar">
-    <button id="copyBtn" class="yb-btn yb-btn-plain">コピー</button>
-    <button id="clearBtn" class="yb-btn yb-btn-danger">クリア</button>
+<header><h1>要約Bot</h1></header>
+<main>
+  <div class="tabs" role="tablist" aria-label="入力方式">
+    <button id="tab-paste" class="active" role="tab" aria-selected="true">ペースト</button>
+    <button id="tab-url" role="tab" aria-selected="false">URL</button>
+    <button id="tab-pdf" role="tab" aria-selected="false" disabled title="PDFは近日対応">PDF（近日）</button>
   </div>
 
-  <script src="app.js" defer></script>
+  <!-- ペースト -->
+  <section id="pane-paste" class="card" role="tabpanel" aria-labelledby="tab-paste">
+    <label class="muted">本文を貼り付け</label>
+    <textarea id="inp-text" placeholder="長文をここに貼り付け…"></textarea>
+  </section>
+
+  <!-- URL -->
+  <section id="pane-url" class="card hidden" role="tabpanel" aria-labelledby="tab-url">
+    <label class="muted">要約したいページのURL</label>
+    <input id="inp-url" type="url" placeholder="https://example.com/article" />
+    <p class="muted">※ 直接取得できないサイトは要約に失敗します。その場合は本文をペーストしてください。</p>
+  </section>
+
+  <!-- オプション -->
+  <section class="card" style="margin-top:12px">
+    <div class="row">
+      <div>
+        <label class="muted">長さ</label>
+        <div class="row3">
+          <label><input type="radio" name="len" value="short" checked /> 短（50–100）</label>
+          <label><input type="radio" name="len" value="medium" /> 中（200–400）</label>
+          <label><input type="radio" name="len" value="long" /> 長（600–800）</label>
+        </div>
+        <div style="margin-top:8px">
+          <label><input type="radio" name="len" value="custom" /> 指定：</label>
+          <input id="len-custom" type="number" min="30" step="10" placeholder="任意の文字数" />
+        </div>
+      </div>
+      <div>
+        <label class="muted">スタイル</label>
+        <select id="style">
+          <option value="bullet">箇条書き</option>
+          <option value="friendly">フレンドリー</option>
+          <option value="business">ビジネス</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- 実行 -->
+  <section class="card" style="margin-top:12px">
+    <div class="btns">
+      <button id="btn-sum" class="btn primary">要約する</button>
+      <button id="btn-copy" class="btn">コピー</button>
+      <button id="btn-clear" class="btn ghost">クリア</button>
+    </div>
+    <div id="status" class="muted" style="margin-top:8px"></div>
+    <div id="out" class="result" style="margin-top:10px"></div>
+  </section>
+
+  <p class="muted" style="margin:14px 4px 0">© 3WA Lab – PDF要約は一時停止中</p>
+</main>
+
+<script>
+  // ★★★ 設定：GASのWebアプリURL（/execで終わるもの）を貼る ★★★
+  const PROXY_ENDPOINT = '<<GAS_WEB_APP_URL_EXEC>>'; // 例: https://script.google.com/macros/s/XXXXXXXX/exec
+
+  // タブ切替
+  const $ = s => document.querySelector(s);
+  const tabPaste = $('#tab-paste'), tabUrl = $('#tab-url');
+  const panePaste = $('#pane-paste'), paneUrl = $('#pane-url');
+  const setTab = (name)=>{
+    const paste = name==='paste';
+    tabPaste.classList.toggle('active', paste);
+    tabPaste.setAttribute('aria-selected', paste);
+    panePaste.classList.toggle('hidden', !paste);
+
+    tabUrl.classList.toggle('active', !paste);
+    tabUrl.setAttribute('aria-selected', !paste);
+    paneUrl.classList.toggle('hidden', paste);
+    localStorage.setItem('yb:lastTab', name);
+  };
+  tabPaste.onclick=()=>setTab('paste');
+  tabUrl.onclick=()=>setTab('url');
+  setTab(localStorage.getItem('yb:lastTab')||'paste');
+
+  // ボタン
+  const btn = $('#btn-sum'), btnCopy = $('#btn-copy'), btnClear=$('#btn-clear');
+  const out = $('#out'), statusEl = $('#status');
+
+  async function summarize(){
+    try{
+      out.textContent=''; statusEl.textContent='要約中…';
+      btn.disabled=true;
+
+      // 入力
+      const mode = tabPaste.classList.contains('active') ? 'paste' : 'url';
+      const text = $('#inp-text').value.trim();
+      const url  = $('#inp-url').value.trim();
+
+      if(mode==='paste' && !text){ throw new Error('本文が空です'); }
+      if(mode==='url'   && !url){ throw new Error('URLを入力してください'); }
+
+      // 長さ
+      const len = [...document.querySelectorAll('input[name=len]')].find(r=>r.checked).value;
+      const custom = Number($('#len-custom').value)||null;
+      const style = $('#style').value;
+
+      // リクエスト
+      const payload = { mode, text, url, length:len, customChars:custom, style };
+      const res = await fetch(PROXY_ENDPOINT, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok){ throw new Error('サーバーエラー: '+res.status); }
+      const data = await res.json();
+
+      if(data.ok){
+        out.textContent = data.summary || '';
+        statusEl.textContent = '完了';
+      }else{
+        throw new Error(data.error || '要約に失敗しました');
+      }
+    }catch(err){
+      statusEl.textContent = '失敗: ' + err.message;
+      out.textContent = '要約に失敗しました。本文をペーストして再試行してください。';
+    }finally{
+      btn.disabled=false;
+    }
+  }
+
+  btn.onclick = summarize;
+
+  btnCopy.onclick = async ()=>{
+    const t = out.textContent.trim();
+    if(!t){ statusEl.textContent='コピーする内容がありません'; return; }
+    await navigator.clipboard.writeText(t);
+    statusEl.textContent='コピーしました';
+    setTimeout(()=>statusEl.textContent='',1500);
+  };
+
+  btnClear.onclick = ()=>{
+    $('#inp-text').value='';
+    $('#inp-url').value='';
+    out.textContent=''; statusEl.textContent='';
+  };
+</script>
 </body>
 </html>
