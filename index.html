@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>要約Bot</title>
+  <title>文章要約Bot</title>
   <style>
     :root{
       --bg:#0b1220; --surface:#0f1a33; --surface-2:#0b162e;
@@ -87,11 +87,13 @@
       .actions{bottom:10px}
       button{width:100%}
     }
+.logo{position:absolute;right:16px;top:12px;height:28px;width:auto;opacity:.95}
+@media (min-width:768px){.logo{height:32px}}
   </style>
 </head>
 <body>
   <header>
-    <h1>要約Bot</h1>
+    <h1>文章要約Bot</h1><img src="logo.jpg" class="logo" alt="ロゴ">
     <div class="sub">URLまたは本文を入れて、読みやすい要約を作ります</div>
   </header>
 
