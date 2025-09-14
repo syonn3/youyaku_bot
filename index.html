@@ -141,8 +141,9 @@
       if (custom) form.append('customChars', custom);
       form.append('style', style);
 
-      const res = await fetch(PROXY_ENDPOINT, { method:'POST', body: form });
-      const data = await res.json();
+      const res = await fetch(PROXY_ENDPOINT, { method: 'POST', body: form });
+const raw = await res.text(); console.log(raw); const data = JSON.parse(raw);
+
 
       if(data.ok){
         out.textContent = data.summary || '';
