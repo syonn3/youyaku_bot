@@ -91,8 +91,11 @@
 .brand{display:flex; align-items:center; gap:12px}
 
 /* 置き換え（position:absolute をやめる） */
+.brand{display:flex; align-items:center; gap:12px}
+.brand h1{margin:0}          /* タイトルの上下余白を消す */
 .logo{height:28px; width:auto; opacity:.95}
 @media (min-width:768px){.logo{height:32px}}
+
 
   </style>
 </head>
@@ -100,7 +103,11 @@
   <header>
     <div class="brand">
   <img src="logo.jpg" class="logo" alt="ロゴ">
+  <div class="brand">
+  <img src="logo.jpg" class="logo" alt="ロゴ">
   <h1>文章要約Bot</h1>
+</div>
+
 </div>
     <div class="sub">URLまたは本文を入れて、読みやすい要約を作ります</div>
   </header>
