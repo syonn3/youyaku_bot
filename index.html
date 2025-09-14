@@ -43,20 +43,17 @@
     <button id="tab-pdf" role="tab" aria-selected="false" disabled title="PDFは近日対応">PDF（近日）</button>
   </div>
 
-  <!-- ペースト -->
   <section id="pane-paste" class="card" role="tabpanel" aria-labelledby="tab-paste">
     <label class="muted">本文を貼り付け</label>
-    <textarea id="inp-text" placeholder="長文をここに貼り付け…"></textarea>
+    <textarea id="inp-text" placeholder="https://script.google.com/macros/s/AKfycbwoRrhGWPUV74cOzYA9NzMD8n212iVWMMIP3AONo3WlTmtt7oD-YFPRdCJ75b4j90g/exec"></textarea>
   </section>
 
-  <!-- URL -->
   <section id="pane-url" class="card hidden" role="tabpanel" aria-labelledby="tab-url">
     <label class="muted">要約したいページのURL</label>
     <input id="inp-url" type="url" placeholder="https://example.com/article" />
     <p class="muted">※ 直接取得できないサイトは要約に失敗します。その場合は本文をペーストしてください。</p>
   </section>
 
-  <!-- オプション -->
   <section class="card" style="margin-top:12px">
     <div class="row">
       <div>
@@ -82,7 +79,6 @@
     </div>
   </section>
 
-  <!-- 実行 -->
   <section class="card" style="margin-top:12px">
     <div class="btns">
       <button id="btn-sum" class="btn primary">要約する</button>
@@ -97,8 +93,7 @@
 </main>
 
 <script>
-  // ★★★ あなたのGAS /exec URL を貼る ★★★
-  const PROXY_ENDPOINT = '<<GAS_WEB_APP_URL_EXEC>>';
+  const PROXY_ENDPOINT = '<<ここにあなたの /exec URL>>';
 
   const $ = s => document.querySelector(s);
   const tabPaste = $('#tab-paste'), tabUrl = $('#tab-url');
@@ -137,13 +132,13 @@
       const custom = $('#len-custom').value.trim();
       const style = $('#style').value;
 
-      // ← ここがCORS対策の肝：Formで送る（ヘッダー不要、プリフライト無し）
+      // フォーム送信（ここがポイント）
       const form = new URLSearchParams();
       form.append('mode', mode);
-      if(text) form.append('text', text);
-      if(url)  form.append('url', url);
+      if (text) form.append('text', text);
+      if (url)  form.append('url', url);
       form.append('length', len);
-      if(custom) form.append('customChars', custom);
+      if (custom) form.append('customChars', custom);
       form.append('style', style);
 
       const res = await fetch(PROXY_ENDPOINT, { method:'POST', body: form });
