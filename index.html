@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>要約Bot</title>
   <meta name="theme-color" content="#111111" />
-  <link rel="stylesheet" href="styles.css" />
   <style>
     :root { --bg:#0b0b0f; --fg:#e9ecf1; --muted:#9aa3af; --acc:#2ea043; --bd:#2b2f36; }
     *{box-sizing:border-box}
@@ -28,7 +27,6 @@
     .btn.ghost{background:transparent}
     .result{min-height:160px;white-space:pre-wrap;border:1px dashed var(--bd);padding:12px;border-radius:12px;background:#0b0e12}
     .hidden{display:none}
-    /* iPhone片手向け */
     @media (max-width:600px){
       main{padding:10px}
       .row,.row3{grid-template-columns:1fr}
@@ -99,13 +97,13 @@
 </main>
 
 <script>
-  // ★★★ 設定：GASのWebアプリURL（/execで終わるもの）を貼る ★★★
-  const PROXY_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxc-T8t3ykw1a5_nnCDuubF-DbWaQGdg64Q2R7o1k0wQ-To4GXIwxlymIbPjYmnPjOf/exec'; // 例: https://script.google.com/macros/s/XXXXXXXX/exec
+  // ★★★ あなたのGAS /exec URL を貼る ★★★
+  const PROXY_ENDPOINT = '<<GAS_WEB_APP_URL_EXEC>>';
 
-  // タブ切替
   const $ = s => document.querySelector(s);
   const tabPaste = $('#tab-paste'), tabUrl = $('#tab-url');
   const panePaste = $('#pane-paste'), paneUrl = $('#pane-url');
+
   const setTab = (name)=>{
     const paste = name==='paste';
     tabPaste.classList.toggle('active', paste);
@@ -121,7 +119,6 @@
   tabUrl.onclick=()=>setTab('url');
   setTab(localStorage.getItem('yb:lastTab')||'paste');
 
-  // ボタン
   const btn = $('#btn-sum'), btnCopy = $('#btn-copy'), btnClear=$('#btn-clear');
   const out = $('#out'), statusEl = $('#status');
 
@@ -130,27 +127,26 @@
       out.textContent=''; statusEl.textContent='要約中…';
       btn.disabled=true;
 
-      // 入力
       const mode = tabPaste.classList.contains('active') ? 'paste' : 'url';
       const text = $('#inp-text').value.trim();
       const url  = $('#inp-url').value.trim();
+      if(mode==='paste' && !text) throw new Error('本文が空です');
+      if(mode==='url'   && !url)  throw new Error('URLを入力してください');
 
-      if(mode==='paste' && !text){ throw new Error('本文が空です'); }
-      if(mode==='url'   && !url){ throw new Error('URLを入力してください'); }
-
-      // 長さ
       const len = [...document.querySelectorAll('input[name=len]')].find(r=>r.checked).value;
-      const custom = Number($('#len-custom').value)||null;
+      const custom = $('#len-custom').value.trim();
       const style = $('#style').value;
 
-      // リクエスト
-      const payload = { mode, text, url, length:len, customChars:custom, style };
-      const res = await fetch(PROXY_ENDPOINT, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
-      });
-      if(!res.ok){ throw new Error('サーバーエラー: '+res.status); }
+      // ← ここがCORS対策の肝：Formで送る（ヘッダー不要、プリフライト無し）
+      const form = new URLSearchParams();
+      form.append('mode', mode);
+      if(text) form.append('text', text);
+      if(url)  form.append('url', url);
+      form.append('length', len);
+      if(custom) form.append('customChars', custom);
+      form.append('style', style);
+
+      const res = await fetch(PROXY_ENDPOINT, { method:'POST', body: form });
       const data = await res.json();
 
       if(data.ok){
