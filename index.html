@@ -14,9 +14,7 @@
     .tab.active{background:#1b2a4b;border-color:#395a9e}
     .card{background:#0f1a33;border:1px solid #182647;border-radius:12px;padding:12px;margin-bottom:12px}
     label{display:block;margin:8px 0 6px 2px;font-size:13px;color:#b9c6d3}
-    textarea,input[type="text"]{width:100%;box-sizing:border-box;background:#0b162e;border:1px solid #21304f;border-radius:8px;color:#e8ecf1;padding:10px}
-    input[type="url"]{width:100%;box-sizing:border-box;background:#0b162e;border:1px solid #21304f;border-radius:8px;color:#e8ecf1;padding:10px}
-    select{background:#0b162e;border:1px solid #21304f;border-radius:8px;color:#e8ecf1;padding:8px}
+    textarea,input[type="text"],input[type="url"],select{width:100%;box-sizing:border-box;background:#0b162e;border:1px solid #21304f;border-radius:8px;color:#e8ecf1;padding:10px}
     .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
     .row > *{margin:4px 0}
     .muted{color:#89a1b5;font-size:12px}
@@ -73,7 +71,7 @@
   </main>
 
   <script>
-    // ★あなたのGAS /exec を設定（あなたの現在のURLを既に反映済み）
+    // ★ あなたのGAS /exec を設定
     const PROXY_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwoRrhGWPUV74cOzYA9NzMD8n212iVWMMIP3AONo3WlTmtt7oD-YFPRdCJ75b4j90g/exec';
 
     const $ = (s)=>document.querySelector(s);
@@ -118,8 +116,7 @@
 
         const res = await fetch(PROXY_ENDPOINT, { method:'POST', body:form });
         const raw = await res.text();
-        let data;
-        try { data = JSON.parse(raw); } catch(e){ throw new Error('サーバ応答が不正です'); }
+        let data; try { data = JSON.parse(raw); } catch(e){ throw new Error('サーバ応答が不正です'); }
 
         if(!data.ok) throw new Error(data.error || '要約に失敗しました');
         out.textContent = data.summary || '';
