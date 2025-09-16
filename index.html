@@ -35,7 +35,7 @@
       border:1px solid var(--border);
     }
 
-    /* 入力テキスト（全文スクロールで見える） */
+    /* 入力テキスト（全文スクロール） */
     #input{
       width:100%; height:40vh; resize:vertical;
       background:var(--surface-2); color:var(--text);
@@ -44,7 +44,7 @@
       overflow:auto; white-space:pre-wrap;
     }
 
-    /* 要約結果（長文もスクロール可能） */
+    /* 要約結果（全文スクロール） */
     #summary{
       white-space:pre-wrap; background:var(--surface-2);
       border:1px solid var(--border); border-radius:10px;
@@ -67,6 +67,7 @@
       background:transparent; padding:8px 10px; border-radius:999px; font-size:.95rem;
     }
     .chip[aria-pressed="true"]{ background:var(--surface-2); outline:2px solid var(--accent) }
+    .toggle{ display:flex; align-items:center; gap:8px; }
   </style>
 </head>
 <body>
@@ -79,8 +80,14 @@
       <button class="btn" onclick="loadFromURL()">🌐 URLを要約</button>
       <button class="btn secondary small" onclick="exampleURL()">例を入れる</button>
     </div>
+    <div class="row" style="margin-top:6px">
+      <label class="toggle">
+        <input type="checkbox" id="directMode" checked />
+        <span class="small">入力欄に入れず、URLからダイレクトに要約結果だけ表示（既定）</span>
+      </label>
+    </div>
     <div class="hint" style="margin-top:6px">
-      まず <code>r.jina.ai</code> で本文抽出（多くのサイトで動作）。ブロックされる場合は本文をペーストしてください。<br>
+      本文抽出はまず <code>r.jina.ai</code> を使用（多くのサイトでCORS回避）。ブロック時は本文をペーストしてください。<br>
       独自プロキシ（GAS等）を使う場合は、下の <code>PROXY_ENDPOINT</code> を設定。
     </div>
   </div>
@@ -119,42 +126,48 @@
 
   <!-- 結果 -->
   <div id="summary" aria-live="polite"></div>
-  <div class="hint">※ デモはローカル整形で長さを微調整。本番でも同じ目標文字数を渡し、返却後に微調整します。</div>
+  <div class="hint">※ デモはクライアント側で長さ調整。サーバ要約/API連携時は「日本語固定＋文字数目標」を直接渡し、返却後に微調整。</div>
 
   <script>
     // ===== 設定（任意）: 独自プロキシ（GAS等）を使う場合はURLを入れてください =====
     // 例）const PROXY_ENDPOINT = "https://script.google.com/macros/s/xxxxxxxxxxxx/exec";
     const PROXY_ENDPOINT = ""; // 空のままなら使わない
 
-    // ===== URL → テキスト抽出 =====
+    // ===== URL → テキスト抽出 → ダイレクト要約（既定） =====
     async function loadFromURL(){
       const input = document.getElementById('urlInput').value.trim();
       const url = normalizeURL(input);
       if(!url){ alert('有効なURLを入力してください'); return; }
 
-      // 1) r.jina.ai 経由で本文テキストを取得（多くのサイトでCORS回避可能）
+      const useDirect = document.getElementById('directMode').checked;
+
+      // 1) r.jina.ai 経由で本文テキストを取得
       const jinaEndpoint = "https://r.jina.ai/http://" + url.replace(/^https?:\/\//,'');
       try{
         const resp = await fetch(jinaEndpoint, { method:'GET' });
         if(resp.ok){
-          const text = await resp.text();
-          if(text && text.trim().length>0){
-            document.getElementById('input').value = text.trim();
-            summarize();
+          const text = (await resp.text() || '').trim();
+          if(text){
+            if(useDirect){
+              summarizeText(text);               // ← 入力欄に入れず直接要約
+            }else{
+              document.getElementById('input').value = text; // ← 入力欄に流し込む
+              summarize();
+            }
             return;
           }
         }
         throw new Error('jina失敗');
       }catch(e){
-        // 2) 任意の独自プロキシ（設定されている場合）
+        // 2) 任意の独自プロキシ
         if(PROXY_ENDPOINT){
           try{
             const resp2 = await fetch(PROXY_ENDPOINT + "?url=" + encodeURIComponent(url), { method:'GET' });
             if(resp2.ok){
-              const data = await resp2.text();
-              if(data && data.trim()){
-                document.getElementById('input').value = data.trim();
-                summarize();
+              const data = (await resp2.text() || '').trim();
+              if(data){
+                if(useDirect){ summarizeText(data); }
+                else{ document.getElementById('input').value = data; summarize(); }
                 return;
               }
             }
@@ -172,7 +185,7 @@
     }
 
     function exampleURL(){
-      document.getElementById('urlInput').value = 'https://ja.wikipedia.org/wiki/%E7%8C%AB';
+      document.getElementById('urlInput').value = 'https://en.wikipedia.org/wiki/Cat';
     }
 
     // ===== クリップボード貼り付け =====
@@ -211,67 +224,86 @@
       document.getElementById('summary').innerText = '';
     }
 
-    // ===== 要約（デモ実装：長さ厳密化＋見やすく整形） =====
+    // ===== 要約（入力欄→要約） =====
     function summarize(){
       const raw = document.getElementById('input').value.trim();
       if(!raw){ alert('本文を用意してください（URL取得 or ペースト）'); return; }
+      summarizeText(raw);
+    }
 
+    // ===== 要約（テキスト→要約） =====
+    function summarizeText(raw){
       const rawLimit = document.getElementById('charLimit').value.toString();
       let limit = Number(rawLimit);
       if(!Number.isFinite(limit) || limit<=0) limit = sanitizeNumberLike(rawLimit);
       if(!limit || limit<30){ limit = 300; document.getElementById('charLimit').value = 300; }
 
-      const draft = heuristicSummarize(raw, limit);
-      const tuned = lengthTuner(draft, limit);
-      document.getElementById('summary').innerText = tuned;
+      // 英文でも最終出力は日本語に寄せる（簡易日本語化ルール）
+      const isLikelyEnglish = /[A-Za-z]/.test(raw) && !/[ぁ-んァ-ン一-龥]/.test(raw.slice(0,500));
+      const base = heuristicSummarize(raw, limit);
+      const tuned = lengthTuner(base, limit);
+      const jp = isLikelyEnglish ? toJapaneseTone(tuned) : tuned;
+
+      document.getElementById('summary').innerText = jp;
     }
 
+    // ざっくり要点抽出（箇条書き風）
     function heuristicSummarize(text, limit){
       const t = text.replace(/\r\n/g,'\n').replace(/\n{3,}/g,'\n\n');
-      let units = t.split(/(?<=[。！？\?])\s+|\n- |\n・|\n|\t/g)
+      let units = t.split(/(?<=[。\.！？\?])\s+|\n- |\n• |\n・|\n|\t/g)
                    .map(s=>s.trim()).filter(Boolean);
 
       const seen = new Set();
       units = units.filter(s=>{
-        const k = s.length>40 ? s.slice(0,40) : s;
-        if(seen.has(k)) return false;
-        seen.add(k);
+        const k = s.length>60 ? s.slice(0,60) : s;
+        if(seen.has(k)) return false; seen.add(k);
         return s.length>1;
       });
 
       let out = '';
       for(const u of units){
         if(out.length + u.length + 1 > Math.max(1200, limit*3)) break;
-        out += (out ? '\n' : '') + (u.startsWith('・') || u.startsWith('-')? u : '・' + u);
+        out += (out ? '\n' : '') + (u.match(/^[-•・]/) ? u.replace(/^[-•]\s?/, '・') : '・' + u);
       }
       if(!out) out = text.slice(0, Math.min(text.length, limit*2));
       return out;
     }
 
+    // 目標文字数に合わせて微調整（±約15%）
     function lengthTuner(text, target){
       const min = Math.round(target*0.85);
       const max = Math.round(target*1.15);
       if(text.length>=min && text.length<=max) return text;
-      if(text.length>max){
-        return smartCut(text, max);
-      }else{
-        return padTo(text, min);
-      }
+      if(text.length>max) return smartCut(text, max);
+      return padTo(text, min);
     }
-
     function smartCut(text, max){
       if(text.length<=max) return text;
       const slice = text.slice(0, max);
-      const p = Math.max(slice.lastIndexOf('。'), slice.lastIndexOf('\n'));
+      const p = Math.max(slice.lastIndexOf('。'), slice.lastIndexOf('\n'), slice.lastIndexOf('. '));
       return (p>0 ? slice.slice(0, p+1) : slice) + (p>0 ? '' : '…');
     }
-
     function padTo(text, min){
       if(text.length>=min) return text;
       const filler = '\n（要点を凝縮しています。詳細は原文をご確認ください。）';
       let out = text + filler;
       if(out.length<min) out = out + ' 追記: 概要の網羅を優先し、細部は省略。';
       return out;
+    }
+
+    // 英文を日本語調に寄せる簡易整形（※本番はAPIで日本語固定に）
+    function toJapaneseTone(s){
+      // 記号を日本語寄りに
+      let t = s.replace(/:\s*/g,'：').replace(/;\s*/g,'；').replace(/ - /g,' — ');
+      // 箇条書きの先頭を「・」に統一
+      t = t.replace(/^\s*[-•]\s?/gm,'・');
+      // 末尾が英語ピリオドのみの行に「。」を補う（ざっくり）
+      t = t.replace(/([a-zA-Z\)])\.\s*$/gm,'$1。');
+      // ヘッダ行を説明調に
+      t = t.replace(/^\s*・\s*(Introduction|Summary|Conclusion)\b.*$/gmi,'・要点:');
+      // 日本語のつなぎ語を足して和文調に（最低限）
+      t = '【要約（日本語）】\n' + t;
+      return t;
     }
 
     // ===== 音声読み上げ =====
