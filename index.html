@@ -22,35 +22,35 @@
     .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
     .card{
       background:var(--surface); border:1px solid var(--border); border-radius:12px;
-      padding:12px;
+      padding:12px; margin-bottom:12px;
+    }
+    .hint{font-size:.85rem; color:var(--muted)}
+    .small{font-size:.9rem}
+
+    /* URL入力 */
+    #urlInput{
+      flex:1 1 220px; min-width:220px;
+      padding:10px 12px; border-radius:10px;
+      background:var(--surface-2); color:var(--text);
+      border:1px solid var(--border);
     }
 
     /* 入力テキスト（全文スクロールで見える） */
     #input{
-      width:100%;
-      height:40vh;                 /* 画面の4割の高さ */
-      resize:vertical;             /* 必要ならドラッグで伸縮 */
-      background:var(--surface-2);
-      color:var(--text);
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:12px;
-      line-height:1.7;
-      overflow:auto;               /* ← ペースト全文スクロール */
-      white-space:pre-wrap;
+      width:100%; height:40vh; resize:vertical;
+      background:var(--surface-2); color:var(--text);
+      border:1px solid var(--border); border-radius:10px;
+      padding:12px; line-height:1.7;
+      overflow:auto; white-space:pre-wrap;
     }
 
     /* 要約結果（長文もスクロール可能） */
     #summary{
-      white-space:pre-wrap;
-      background:var(--surface-2);
-      border:1px solid var(--border);
-      padding:12px; margin:12px 0; border-radius:10px;
-      max-height:42vh;             /* 画面の約4割まで表示 */
-      overflow:auto;               /* ← 要約も全文スクロール */
+      white-space:pre-wrap; background:var(--surface-2);
+      border:1px solid var(--border); border-radius:10px;
+      padding:12px; max-height:42vh; overflow:auto;
     }
 
-    label{font-size:.95rem; color:var(--muted)}
     input[type="number"]{
       width:120px; padding:8px 10px;
       background:var(--surface-2); color:var(--text);
@@ -67,16 +67,26 @@
       background:transparent; padding:8px 10px; border-radius:999px; font-size:.95rem;
     }
     .chip[aria-pressed="true"]{ background:var(--surface-2); outline:2px solid var(--accent) }
-
-    .hint{font-size:.85rem; color:var(--muted)}
-    .small{font-size:.9rem}
   </style>
 </head>
 <body>
   <h1>文章要約Bot</h1>
 
-  <!-- ---- 入力 ---- -->
-  <div class="card" style="margin-bottom:12px">
+  <!-- URL入力＆取得 -->
+  <div class="card">
+    <div class="row">
+      <input id="urlInput" type="url" placeholder="https:// から始まる要約したいページのURLを貼り付け" />
+      <button class="btn" onclick="loadFromURL()">🌐 URLを要約</button>
+      <button class="btn secondary small" onclick="exampleURL()">例を入れる</button>
+    </div>
+    <div class="hint" style="margin-top:6px">
+      まず <code>r.jina.ai</code> で本文抽出（多くのサイトで動作）。ブロックされる場合は本文をペーストしてください。<br>
+      独自プロキシ（GAS等）を使う場合は、下の <code>PROXY_ENDPOINT</code> を設定。
+    </div>
+  </div>
+
+  <!-- 入力（ペースト） -->
+  <div class="card">
     <div class="row" style="justify-content:space-between">
       <label class="small">下に本文をペースト（長文OK／スクロール可）</label>
       <button class="btn secondary small" onclick="pasteFromClipboard()">📋 ペースト</button>
@@ -84,8 +94,8 @@
     <textarea id="input" placeholder="ここに記事や本文をそのまま貼り付け"></textarea>
   </div>
 
-  <!-- ---- 設定（長さ指定）---- -->
-  <div class="card" style="margin-bottom:12px">
+  <!-- 設定（長さ指定） -->
+  <div class="card">
     <div class="row">
       <span class="hint">長さ（目標文字数）:</span>
       <button class="chip" id="lenShort"  onclick="pickPreset(100)" aria-pressed="false">短: 50–100</button>
@@ -96,26 +106,88 @@
       <span class="hint">文字</span>
     </div>
     <div class="hint" style="margin-top:6px">
-      数字以外（「2,00」など）は自動で正規化します。実際の要約は±10〜15%の誤差を許容。
+      「2,00」「２００」などは自動で数値化。仕上がりは目標の ±10〜15% を目安に調整。
     </div>
   </div>
 
-  <!-- ---- 操作 ---- -->
+  <!-- 操作 -->
   <div class="row" style="margin-bottom:8px">
     <button class="btn" onclick="summarize()">🧠 要約する</button>
     <button class="btn secondary" onclick="clearAll()">🧹 クリア</button>
     <button class="btn" onclick="speakSummary()">🔊 読み上げ</button>
   </div>
 
-  <!-- ---- 結果 ---- -->
+  <!-- 結果 -->
   <div id="summary" aria-live="polite"></div>
-  <div class="hint">※ デモ版はクライアント側で長さ調整を厳密化。本番APIでも同じ目標文字数を渡し、完了後に微調整します。</div>
+  <div class="hint">※ デモはローカル整形で長さを微調整。本番でも同じ目標文字数を渡し、返却後に微調整します。</div>
 
   <script>
-    // --- ユーティリティ ---
+    // ===== 設定（任意）: 独自プロキシ（GAS等）を使う場合はURLを入れてください =====
+    // 例）const PROXY_ENDPOINT = "https://script.google.com/macros/s/xxxxxxxxxxxx/exec";
+    const PROXY_ENDPOINT = ""; // 空のままなら使わない
+
+    // ===== URL → テキスト抽出 =====
+    async function loadFromURL(){
+      const input = document.getElementById('urlInput').value.trim();
+      const url = normalizeURL(input);
+      if(!url){ alert('有効なURLを入力してください'); return; }
+
+      // 1) r.jina.ai 経由で本文テキストを取得（多くのサイトでCORS回避可能）
+      const jinaEndpoint = "https://r.jina.ai/http://" + url.replace(/^https?:\/\//,'');
+      try{
+        const resp = await fetch(jinaEndpoint, { method:'GET' });
+        if(resp.ok){
+          const text = await resp.text();
+          if(text && text.trim().length>0){
+            document.getElementById('input').value = text.trim();
+            summarize();
+            return;
+          }
+        }
+        throw new Error('jina失敗');
+      }catch(e){
+        // 2) 任意の独自プロキシ（設定されている場合）
+        if(PROXY_ENDPOINT){
+          try{
+            const resp2 = await fetch(PROXY_ENDPOINT + "?url=" + encodeURIComponent(url), { method:'GET' });
+            if(resp2.ok){
+              const data = await resp2.text();
+              if(data && data.trim()){
+                document.getElementById('input').value = data.trim();
+                summarize();
+                return;
+              }
+            }
+          }catch(_){}
+        }
+        alert('本文取得に失敗しました。サイト側の制限の可能性があります。本文をペーストして要約してください。');
+      }
+    }
+
+    function normalizeURL(str){
+      if(!str) return '';
+      let s = str.trim();
+      if(!/^https?:\/\//i.test(s)) s = 'https://' + s;
+      try{ new URL(s); return s; }catch{ return ''; }
+    }
+
+    function exampleURL(){
+      document.getElementById('urlInput').value = 'https://ja.wikipedia.org/wiki/%E7%8C%AB';
+    }
+
+    // ===== クリップボード貼り付け =====
+    async function pasteFromClipboard(){
+      try{
+        const text = await navigator.clipboard.readText();
+        if(text){ document.getElementById('input').value = text; }
+      }catch(e){
+        alert('クリップボードから貼り付けできませんでした。長押し→ペーストを使ってください。');
+      }
+    }
+
+    // ===== UIユーティリティ =====
     function sanitizeNumberLike(v){
-      // 全角→半角、カンマ・空白を除去して数値化
-      const z2h = v.replace(/[０-９，、．．\s]/g, s=>{
+      const z2h = v.toString().replace(/[０-９，、．．\s]/g, s=>{
         const code = s.charCodeAt(0);
         if (s === '，' || s === '、' || s === ',') return '';
         if (s === '．' || s === '。' || s === '.') return '';
@@ -134,51 +206,31 @@
       if (n<=120) setPressed('lenShort'); else if (n<=450) setPressed('lenMid'); else setPressed('lenLong');
     }
 
-    async function pasteFromClipboard(){
-      try{
-        const text = await navigator.clipboard.readText();
-        if(text){ document.getElementById('input').value = text; }
-      }catch(e){
-        alert('クリップボードから貼り付けできませんでした。長押し→ペーストを使ってください。');
-      }
-    }
-
     function clearAll(){
       document.getElementById('input').value = '';
       document.getElementById('summary').innerText = '';
     }
 
-    // --- 要約（デモ用ローカル実装） ---
+    // ===== 要約（デモ実装：長さ厳密化＋見やすく整形） =====
     function summarize(){
       const raw = document.getElementById('input').value.trim();
-      if(!raw){ alert('本文をペーストしてください'); return; }
+      if(!raw){ alert('本文を用意してください（URL取得 or ペースト）'); return; }
 
-      // 文字数指定を正規化（例: "2,00" → 200）
       const rawLimit = document.getElementById('charLimit').value.toString();
       let limit = Number(rawLimit);
-      if(!Number.isFinite(limit) || limit<=0){
-        limit = sanitizeNumberLike(rawLimit);
-      }
+      if(!Number.isFinite(limit) || limit<=0) limit = sanitizeNumberLike(rawLimit);
       if(!limit || limit<30){ limit = 300; document.getElementById('charLimit').value = 300; }
 
-      // ここで本来はAPI要約を呼ぶ：
-      // const ai = await callSummarizeAPI(raw, { targetChars: limit, style, ... });
-      // 今はデモとして、本文を「段落→要点抽出→指定文字数に近づけて整形」
       const draft = heuristicSummarize(raw, limit);
       const tuned = lengthTuner(draft, limit);
       document.getElementById('summary').innerText = tuned;
     }
 
-    // ざっくり要点抽出（行頭や「。」「・」「- 」などを頼りに分割→上位を採用）
     function heuristicSummarize(text, limit){
-      // 改行正規化
       const t = text.replace(/\r\n/g,'\n').replace(/\n{3,}/g,'\n\n');
-      // 候補文の切り出し
-      let units = t
-        .split(/(?<=[。！？\?])\s+|\n- |\n・|\n|\t/g)
-        .map(s=>s.trim()).filter(Boolean);
+      let units = t.split(/(?<=[。！？\?])\s+|\n- |\n・|\n|\t/g)
+                   .map(s=>s.trim()).filter(Boolean);
 
-      // 重複/ノイズ削り
       const seen = new Set();
       units = units.filter(s=>{
         const k = s.length>40 ? s.slice(0,40) : s;
@@ -187,31 +239,22 @@
         return s.length>1;
       });
 
-      // 短い要素をまとめてスニペット化
       let out = '';
       for(const u of units){
-        if(out.length + u.length + 1 > Math.max(1200, limit*3)) break; // 過剰連結防止
+        if(out.length + u.length + 1 > Math.max(1200, limit*3)) break;
         out += (out ? '\n' : '') + (u.startsWith('・') || u.startsWith('-')? u : '・' + u);
       }
       if(!out) out = text.slice(0, Math.min(text.length, limit*2));
       return out;
     }
 
-    // 目標文字数に合わせて微調整（±約15%に収める）
     function lengthTuner(text, target){
       const min = Math.round(target*0.85);
       const max = Math.round(target*1.15);
-
-      // 近いならそのまま
       if(text.length>=min && text.length<=max) return text;
-
       if(text.length>max){
-        // 文章末尾（句点/改行）で気持ちよく切る
-        const cut = smartCut(text, max);
-        return cut;
+        return smartCut(text, max);
       }else{
-        // 少ないとき：元テキストから追加で少し継ぎ足すのが本来だが、
-        // デモでは冗長語を少し足して体裁を整える
         return padTo(text, min);
       }
     }
@@ -231,18 +274,17 @@
       return out;
     }
 
-    // --- 音声読み上げ（据え置き） ---
+    // ===== 音声読み上げ =====
     function speakSummary(){
       const text = document.getElementById('summary').innerText.trim();
       if(!text){ alert('要約文がありません'); return; }
-      // 連続押下時に前の発話を止める
       if(speechSynthesis.speaking) speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'ja-JP';
       speechSynthesis.speak(utter);
     }
 
-    // 初期ボタン状態
+    // 初期化
     pickPreset(300);
   </script>
 </body>
