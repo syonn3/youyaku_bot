@@ -116,8 +116,8 @@
 
   <main>
     <div class="tabs">
-      <div id="tab-paste" class="tab active" onclick="setTab('paste')">ペースト要約</div>
-      <div id="tab-url" class="tab" onclick="setTab('url')">URL要約</div>
+      <div id="tab-paste" class="tab active" onclick="setTab('paste')">文字ペースト</div>
+      <div id="tab-url" class="tab" onclick="setTab('url')">URLペースト</div>
     </div>
 
     <div class="card" id="pane-paste">
@@ -153,8 +153,8 @@
           <div class="actions">
             <button id="btn-go" onclick="summarize()">要約する</button>
             <button class="btn-ghost" onclick="clearAll()">クリア</button>
-            <!-- 🔊 読み上げボタン追加 -->
-            <button class="btn-ghost" onclick="speakSummary()">🔊 読み上げ</button>
+            <!-- 読み上げボタン（ラベルはJSで制御） -->
+            <button id="btn-speak" class="btn-ghost" onclick="toggleSpeak()">読み上げ</button>
           </div>
         </div>
       </div>
@@ -162,7 +162,7 @@
       <div class="status" id="status"><span class="dot"></span><span id="status-text"></span></div>
       <pre id="out"></pre>
       <div class="copy-bar">
-        <small class="muted">結果をコピーできます</small>
+        <small id="copy-hint" class="muted">結果をコピーできます</small>
         <div style="display:flex; gap:8px">
           <button class="btn-ghost" onclick="copyOut()">コピー</button>
         </div>
@@ -181,6 +181,10 @@
     const btn = $('#btn-go');
     const urlInput = $('#inp-url');
     const lenCustom = $('#len-custom');
+    const btnSpeak = $('#btn-speak');
+    const copyHint = $('#copy-hint');
+
+    let speaking = false; // 読み上げ状態
 
     function setTab(name){
       const isPaste = name==='paste';
@@ -222,6 +226,9 @@
         if(btn.disabled) return;
         out.textContent=''; setLoading(true,'要約中…'); btn.disabled=true;
 
+        // 読み上げ中なら止めておく
+        if(speaking) stopSpeak();
+
         const mode = tabPaste.classList.contains('active') ? 'paste' : 'url';
         const text = $('#inp-text').value.trim();
         const url  = urlInput.value.trim();
@@ -261,34 +268,70 @@
 
     function copyOut(){
       const txt = out.textContent || '';
-      if(!txt){ statusText.textContent = 'コピーする内容がありません'; return; }
+      if(!txt){
+        statusText.textContent = 'コピーする内容がありません';
+        return;
+      }
       if(navigator.clipboard){
-        navigator.clipboard.writeText(txt).then(()=>{ statusText.textContent='コピーしました'; });
+        navigator.clipboard.writeText(txt).then(()=>{
+          statusText.textContent='コピーしました';
+          if(copyHint) copyHint.textContent='コピーしました';
+        });
       }else{
         const ta=document.createElement('textarea');
         ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
         statusText.textContent='コピーしました';
+        if(copyHint) copyHint.textContent='コピーしました';
       }
     }
 
     function clearAll(){
       $('#inp-text').value=''; urlInput.value=''; out.textContent=''; statusText.textContent='';
+      if(copyHint) copyHint.textContent='結果をコピーできます';
+      if(speaking) stopSpeak();
     }
 
-    // 🔊 読み上げ機能
-    function speakSummary(){
+    // ===== 読み上げ（トグル） =====
+    function toggleSpeak(){
+      if(speaking){
+        stopSpeak();
+      }else{
+        startSpeak();
+      }
+    }
+    function startSpeak(){
       const text = out.textContent.trim();
       if(!text){
         statusText.textContent = '読み上げる要約がありません';
         return;
       }
-      if(speechSynthesis.speaking) speechSynthesis.cancel();
+      if(speechSynthesis.speaking){ speechSynthesis.cancel(); }
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'ja-JP';
       u.rate = 1.0;
       u.pitch = 1.0;
+      u.onstart = ()=>{
+        speaking = true;
+        if(btnSpeak) btnSpeak.textContent = '読み上げ停止';
+        statusText.textContent = '読み上げ中…';
+      };
+      u.onend = ()=>{
+        speaking = false;
+        if(btnSpeak) btnSpeak.textContent = '読み上げ';
+        statusText.textContent = '完了';
+      };
+      u.onerror = ()=>{
+        speaking = false;
+        if(btnSpeak) btnSpeak.textContent = '読み上げ';
+        statusText.textContent = 'エラー: 読み上げに失敗しました';
+      };
       speechSynthesis.speak(u);
-      statusText.textContent = '読み上げ中…';
+    }
+    function stopSpeak(){
+      try{ speechSynthesis.cancel(); }catch(_){}
+      speaking = false;
+      if(btnSpeak) btnSpeak.textContent = '読み上げ';
+      statusText.textContent = '停止しました';
     }
   </script>
 </body>
