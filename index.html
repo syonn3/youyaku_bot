@@ -153,6 +153,8 @@
           <div class="actions">
             <button id="btn-go" onclick="summarize()">要約する</button>
             <button class="btn-ghost" onclick="clearAll()">クリア</button>
+            <!-- 🔊 読み上げボタン追加 -->
+            <button class="btn-ghost" onclick="speakSummary()">🔊 読み上げ</button>
           </div>
         </div>
       </div>
@@ -271,6 +273,22 @@
 
     function clearAll(){
       $('#inp-text').value=''; urlInput.value=''; out.textContent=''; statusText.textContent='';
+    }
+
+    // 🔊 読み上げ機能
+    function speakSummary(){
+      const text = out.textContent.trim();
+      if(!text){
+        statusText.textContent = '読み上げる要約がありません';
+        return;
+      }
+      if(speechSynthesis.speaking) speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ja-JP';
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      speechSynthesis.speak(u);
+      statusText.textContent = '読み上げ中…';
     }
   </script>
 </body>
