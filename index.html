@@ -1,254 +1,249 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <link rel="icon" href="logo.jpg">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>文章要約Bot</title>
-  <!-- PNG推奨 -->
-<link rel="apple-touch-icon" href="logo.jpg">
-<!-- icon-180.pngのロゴを使うならこっち -->
-<!-- <link rel="apple-touch-icon" href="icon-180.png"> -->
+  <link rel="apple-touch-icon" href="logo.jpg" />
 
   <style>
     :root{
       --bg:#0b1220; --surface:#0f1a33; --surface-2:#0b162e;
       --border:#1c2a4a; --text:#e8ecf1; --muted:#9fb1c7;
-      --accent:#2a5bd7; --accent-2:#5b86ff; --ring:rgba(90,130,255,.45);
-      --ok:#7ddc8d; --err:#ff7a7a;
-      --radius:14px;
+      --accent:#2a5bd7; --danger:#e35d5d;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
     body{
-      margin:0; background:var(--bg); color:var(--text);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
-      -webkit-tap-highlight-color:transparent;
+      background:var(--bg); color:var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      margin:0; padding:16px; line-height:1.6;
     }
-    header{
-      position:sticky; top:0; z-index:10;
-      backdrop-filter: saturate(1.2) blur(6px);
-      background:linear-gradient(180deg, rgba(11,18,32,.9), rgba(11,18,32,.6));
-      border-bottom:1px solid var(--border);
-      padding:16px 20px;
-    }
-    h1{margin:0; font-size:18px; letter-spacing:.2px}
-    .sub{margin:2px 0 0; font-size:12px; color:var(--muted)}
-    main{max-width:900px; margin:0 auto; padding:16px; padding-bottom:28vh;}
-    .tabs{display:flex; gap:8px; margin:12px 0 14px}
-    .tab{
-      padding:8px 14px; border:1px solid var(--border); border-radius:999px;
-      cursor:pointer; background:var(--surface-2); color:var(--text); user-select:none;
-    }
-    .tab.active{ background:linear-gradient(180deg,#1b2a4b,#142243); border-color:#37569a; }
+    h1{font-size:1.25rem; margin:0 0 12px}
+    .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
     .card{
-      background:var(--surface); border:1px solid var(--border);
-      border-radius:var(--radius); padding:14px; margin-bottom:14px;
-      box-shadow: 0 0 0 1px rgba(255,255,255,.02) inset, 0 10px 24px rgba(0,0,0,.25);
-    }
-    label{display:block; margin:8px 0 6px 2px; font-size:13px; color:var(--muted)}
-    textarea,input[type="text"],input[type="url"],select{
-      width:100%; background:var(--surface-2); border:1px solid var(--border);
-      border-radius:12px; color:var(--text); padding:12px; font-size:16px; /* iOSズーム防止 */
-      outline:none; transition:border-color .15s, box-shadow .15s;
-    }
-    textarea{min-height:220px; resize:vertical}
-    textarea:focus, input:focus, select:focus{
-      border-color:var(--accent-2); box-shadow:0 0 0 3px var(--ring);
-    }
-    .muted{color:var(--muted); font-size:12px}
-    .row{display:flex; flex-wrap:wrap; gap:12px; align-items:center}
-    .row > *{margin:4px 0}
-    select{min-width:200px}
-    button{
-      background:linear-gradient(180deg,var(--accent),#1f4fc0);
-      border:none; color:#fff; padding:12px 18px; border-radius:12px;
-      font-weight:700; font-size:16px; cursor:pointer;
-      box-shadow:0 10px 18px rgba(42,91,215,.28);
-    }
-    button:disabled{opacity:.65; cursor:not-allowed; filter:grayscale(.2)}
-    .btn-ghost{
-      background:transparent; border:1px solid var(--border); color:var(--text);
-      box-shadow:none;
-    }
-    pre{
-      white-space:pre-wrap; word-break:break-word;
-      background:var(--surface-2); border:1px solid var(--border);
-      border-radius:var(--radius); padding:14px; min-height:120px;
-    }
-    .status{min-height:22px; color:#9ec1ff; display:flex; align-items:center; gap:8px}
-    .dot{width:10px; height:10px; border-radius:50%; background:var(--accent); display:none}
-    .loading .dot{display:inline-block; animation:pulse 1s ease-in-out infinite}
-    @keyframes pulse{0%{transform:scale(.9);opacity:.6}50%{transform:scale(1);opacity:1}100%{transform:scale(.9);opacity:.6}}
-    .actions{
-      position:sticky; bottom:12px; z-index:5; display:flex; gap:8px; align-items:center; justify-content:flex-end;
-      margin-top:8px; padding:8px; border:1px solid var(--border); border-radius:12px;
-      background:linear-gradient(180deg, rgba(15,26,51,.95), rgba(15,26,51,.85));
-      backdrop-filter: blur(6px);
-    }
-    .copy-bar{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:10px}
-    .copy-bar button{padding:8px 12px; font-size:14px}
-    @media (max-width:480px){
-      select{min-width:unset}
-      .actions{bottom:10px}
-      button{width:100%}
+      background:var(--surface); border:1px solid var(--border); border-radius:12px;
+      padding:12px;
     }
 
+    /* 入力テキスト（全文スクロールで見える） */
+    #input{
+      width:100%;
+      height:40vh;                 /* 画面の4割の高さ */
+      resize:vertical;             /* 必要ならドラッグで伸縮 */
+      background:var(--surface-2);
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:12px;
+      line-height:1.7;
+      overflow:auto;               /* ← ペースト全文スクロール */
+      white-space:pre-wrap;
+    }
 
-/* 置き換え（position:absolute をやめる） */
-.brand{display:flex; align-items:center; gap:12px}
-.brand h1{margin:0}          /* タイトルの上下余白を消す */
-.logo{height:28px; width:auto; opacity:.95}
-@media (min-width:768px){.logo{height:32px}}
+    /* 要約結果（長文もスクロール可能） */
+    #summary{
+      white-space:pre-wrap;
+      background:var(--surface-2);
+      border:1px solid var(--border);
+      padding:12px; margin:12px 0; border-radius:10px;
+      max-height:42vh;             /* 画面の約4割まで表示 */
+      overflow:auto;               /* ← 要約も全文スクロール */
+    }
 
+    label{font-size:.95rem; color:var(--muted)}
+    input[type="number"]{
+      width:120px; padding:8px 10px;
+      background:var(--surface-2); color:var(--text);
+      border:1px solid var(--border); border-radius:8px;
+    }
+    .btn{
+      background:var(--accent); color:#fff; border:none;
+      padding:10px 14px; border-radius:10px; font-size:1rem;
+    }
+    .btn.secondary{ background:transparent; color:var(--text); border:1px solid var(--border); }
+    .btn.danger{ background:var(--danger); }
+    .chip{
+      border:1px solid var(--border); color:var(--text);
+      background:transparent; padding:8px 10px; border-radius:999px; font-size:.95rem;
+    }
+    .chip[aria-pressed="true"]{ background:var(--surface-2); outline:2px solid var(--accent) }
 
+    .hint{font-size:.85rem; color:var(--muted)}
+    .small{font-size:.9rem}
   </style>
 </head>
 <body>
- <header>
-  <div class="brand">
-    <img src="logo.jpg" class="logo" alt="ロゴ">
-    <h1>文章要約Bot</h1>
+  <h1>文章要約Bot</h1>
+
+  <!-- ---- 入力 ---- -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="row" style="justify-content:space-between">
+      <label class="small">下に本文をペースト（長文OK／スクロール可）</label>
+      <button class="btn secondary small" onclick="pasteFromClipboard()">📋 ペースト</button>
+    </div>
+    <textarea id="input" placeholder="ここに記事や本文をそのまま貼り付け"></textarea>
   </div>
-  <div class="sub">URLまたは本文を入れて、読みやすい要約を作ります</div>
-</header>
 
-
-  <main>
-    <div class="tabs">
-      <div id="tab-paste" class="tab active" onclick="setTab('paste')">ペースト要約</div>
-      <div id="tab-url" class="tab" onclick="setTab('url')">URL要約</div>
+  <!-- ---- 設定（長さ指定）---- -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="row">
+      <span class="hint">長さ（目標文字数）:</span>
+      <button class="chip" id="lenShort"  onclick="pickPreset(100)" aria-pressed="false">短: 50–100</button>
+      <button class="chip" id="lenMid"    onclick="pickPreset(300)" aria-pressed="true">中: 200–400</button>
+      <button class="chip" id="lenLong"   onclick="pickPreset(700)" aria-pressed="false">長: 600–800</button>
+      <span class="hint">／ 直接指定:</span>
+      <input id="charLimit" type="number" min="30" max="2000" step="10" value="300" inputmode="numeric" pattern="[0-9]*" />
+      <span class="hint">文字</span>
     </div>
-
-    <div class="card" id="pane-paste">
-      <label for="inp-text">本文をペースト</label>
-      <textarea id="inp-text" rows="10" placeholder="ここに本文を貼り付けてください"></textarea>
+    <div class="hint" style="margin-top:6px">
+      数字以外（「2,00」など）は自動で正規化します。実際の要約は±10〜15%の誤差を許容。
     </div>
+  </div>
 
-    <div class="card" id="pane-url" style="display:none">
-      <label for="inp-url">URL</label>
-      <input id="inp-url" type="url" placeholder="https://example.com/..." />
-      <div class="muted">※ 取得できないサイトもあります。失敗する場合は本文をペーストしてください。</div>
-    </div>
+  <!-- ---- 操作 ---- -->
+  <div class="row" style="margin-bottom:8px">
+    <button class="btn" onclick="summarize()">🧠 要約する</button>
+    <button class="btn secondary" onclick="clearAll()">🧹 クリア</button>
+    <button class="btn" onclick="speakSummary()">🔊 読み上げ</button>
+  </div>
 
-    <div class="card">
-      <div class="row">
-        <div>
-          <label>長さ</label>
-          <label><input type="radio" name="len" value="short"> 短</label>
-          <label><input type="radio" name="len" value="medium" checked> 中</label>
-          <label><input type="radio" name="len" value="long"> 長</label>
-          <label><input type="radio" name="len" value="custom"> 指定</label>
-          <input id="len-custom" type="text" placeholder="文字数（例 300）" style="width:120px">
-        </div>
-        <div>
-          <label>スタイル</label>
-          <select id="style">
-            <option value="business" selected>ビジネス</option>
-            <option value="bullet">箇条書き</option>
-          </select>
-        </div>
-        <div style="margin-left:auto">
-          <label>&nbsp;</label><br>
-          <div class="actions">
-            <button id="btn-go" onclick="summarize()">要約する</button>
-            <button class="btn-ghost" onclick="clearAll()">クリア</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="status" id="status"><span class="dot"></span><span id="status-text"></span></div>
-      <pre id="out"></pre>
-      <div class="copy-bar">
-        <small class="muted">結果をコピーできます</small>
-        <div style="display:flex; gap:8px">
-          <button class="btn-ghost" onclick="copyOut()">コピー</button>
-        </div>
-      </div>
-    </div>
-  </main>
+  <!-- ---- 結果 ---- -->
+  <div id="summary" aria-live="polite"></div>
+  <div class="hint">※ デモ版はクライアント側で長さ調整を厳密化。本番APIでも同じ目標文字数を渡し、完了後に微調整します。</div>
 
   <script>
-    // ★ あなたのGAS /exec
-    const PROXY_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwoRrhGWPUV74cOzYA9NzMD8n212iVWMMIP3AONo3WlTmtt7oD-YFPRdCJ75b4j90g/exec';
-
-    const $ = (s)=>document.querySelector(s);
-    const tabPaste = $('#tab-paste'), tabUrl = $('#tab-url');
-    const panePaste = $('#pane-paste'), paneUrl = $('#pane-url');
-    const out = $('#out'), statusWrap = $('#status'), statusText = $('#status-text');
-    const btn = $('#btn-go');
-
-    function setTab(name){
-      const isPaste = name==='paste';
-      tabPaste.classList.toggle('active', isPaste);
-      tabUrl.classList.toggle('active', !isPaste);
-      panePaste.style.display = isPaste ? '' : 'none';
-      paneUrl.style.display = isPaste ? 'none' : '';
-      localStorage.setItem('yb:lastTab', name);
+    // --- ユーティリティ ---
+    function sanitizeNumberLike(v){
+      // 全角→半角、カンマ・空白を除去して数値化
+      const z2h = v.replace(/[０-９，、．．\s]/g, s=>{
+        const code = s.charCodeAt(0);
+        if (s === '，' || s === '、' || s === ',') return '';
+        if (s === '．' || s === '。' || s === '.') return '';
+        if (code >= 0xFF10 && code <= 0xFF19) return String.fromCharCode(code - 0xFF10 + 0x30);
+        return '';
+      }).replace(/[^\d]/g,'');
+      return Number(z2h || 0);
     }
-    (function initTab(){
-      const last = localStorage.getItem('yb:lastTab');
-      if(last==='url') setTab('url');
-    })();
-
-    function setLoading(on){
-      statusWrap.classList.toggle('loading', on);
-      statusText.textContent = on ? '要約中…' : '完了';
+    function setPressed(id){
+      ['lenShort','lenMid','lenLong'].forEach(k=>{
+        document.getElementById(k).setAttribute('aria-pressed', k===id ? 'true' : 'false');
+      });
+    }
+    function pickPreset(n){
+      document.getElementById('charLimit').value = n;
+      if (n<=120) setPressed('lenShort'); else if (n<=450) setPressed('lenMid'); else setPressed('lenLong');
     }
 
-    async function summarize(){
+    async function pasteFromClipboard(){
       try{
-        out.textContent=''; setLoading(true); btn.disabled=true; statusText.textContent='要約中…';
-
-        const mode = tabPaste.classList.contains('active') ? 'paste' : 'url';
-        const text = $('#inp-text').value.trim();
-        const url  = $('#inp-url').value.trim();
-        if(mode==='paste' && !text) throw new Error('本文を入れてください');
-        if(mode==='url'   && !url)  throw new Error('URLを入れてください');
-
-        const len = [...document.querySelectorAll('input[name=len]')].find(r=>r.checked).value;
-        const custom = $('#len-custom').value.trim();
-        const style = $('#style').value; // business / bullet
-
-        const form = new URLSearchParams();
-        form.append('mode', mode);
-        if(text) form.append('text', text);
-        if(url)  form.append('url', url);
-        form.append('length', len);
-        if(custom) form.append('customChars', custom);
-        form.append('style', style);
-
-        const res = await fetch(PROXY_ENDPOINT, { method:'POST', body:form });
-        const raw = await res.text();
-        let data; try { data = JSON.parse(raw); } catch(e){ throw new Error('サーバ応答が不正です'); }
-
-        if(!data.ok) throw new Error(data.error || '要約に失敗しました');
-        out.textContent = data.summary || '';
-        setLoading(false);
-      }catch(err){
-        statusWrap.classList.remove('loading');
-        statusText.textContent = 'エラー: ' + err.message;
-        out.textContent = '要約に失敗しました。やり直してください。';
-      }finally{
-        btn.disabled=false;
-      }
-    }
-
-    function copyOut(){
-      const txt = out.textContent || '';
-      if(!txt){ statusText.textContent = 'コピーする内容がありません'; return; }
-      if(navigator.clipboard){
-        navigator.clipboard.writeText(txt).then(()=>{ statusText.textContent='コピーしました'; });
-      }else{
-        const ta=document.createElement('textarea');
-        ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-        statusText.textContent='コピーしました';
+        const text = await navigator.clipboard.readText();
+        if(text){ document.getElementById('input').value = text; }
+      }catch(e){
+        alert('クリップボードから貼り付けできませんでした。長押し→ペーストを使ってください。');
       }
     }
 
     function clearAll(){
-      $('#inp-text').value=''; $('#inp-url').value=''; out.textContent=''; statusText.textContent='';
+      document.getElementById('input').value = '';
+      document.getElementById('summary').innerText = '';
     }
+
+    // --- 要約（デモ用ローカル実装） ---
+    function summarize(){
+      const raw = document.getElementById('input').value.trim();
+      if(!raw){ alert('本文をペーストしてください'); return; }
+
+      // 文字数指定を正規化（例: "2,00" → 200）
+      const rawLimit = document.getElementById('charLimit').value.toString();
+      let limit = Number(rawLimit);
+      if(!Number.isFinite(limit) || limit<=0){
+        limit = sanitizeNumberLike(rawLimit);
+      }
+      if(!limit || limit<30){ limit = 300; document.getElementById('charLimit').value = 300; }
+
+      // ここで本来はAPI要約を呼ぶ：
+      // const ai = await callSummarizeAPI(raw, { targetChars: limit, style, ... });
+      // 今はデモとして、本文を「段落→要点抽出→指定文字数に近づけて整形」
+      const draft = heuristicSummarize(raw, limit);
+      const tuned = lengthTuner(draft, limit);
+      document.getElementById('summary').innerText = tuned;
+    }
+
+    // ざっくり要点抽出（行頭や「。」「・」「- 」などを頼りに分割→上位を採用）
+    function heuristicSummarize(text, limit){
+      // 改行正規化
+      const t = text.replace(/\r\n/g,'\n').replace(/\n{3,}/g,'\n\n');
+      // 候補文の切り出し
+      let units = t
+        .split(/(?<=[。！？\?])\s+|\n- |\n・|\n|\t/g)
+        .map(s=>s.trim()).filter(Boolean);
+
+      // 重複/ノイズ削り
+      const seen = new Set();
+      units = units.filter(s=>{
+        const k = s.length>40 ? s.slice(0,40) : s;
+        if(seen.has(k)) return false;
+        seen.add(k);
+        return s.length>1;
+      });
+
+      // 短い要素をまとめてスニペット化
+      let out = '';
+      for(const u of units){
+        if(out.length + u.length + 1 > Math.max(1200, limit*3)) break; // 過剰連結防止
+        out += (out ? '\n' : '') + (u.startsWith('・') || u.startsWith('-')? u : '・' + u);
+      }
+      if(!out) out = text.slice(0, Math.min(text.length, limit*2));
+      return out;
+    }
+
+    // 目標文字数に合わせて微調整（±約15%に収める）
+    function lengthTuner(text, target){
+      const min = Math.round(target*0.85);
+      const max = Math.round(target*1.15);
+
+      // 近いならそのまま
+      if(text.length>=min && text.length<=max) return text;
+
+      if(text.length>max){
+        // 文章末尾（句点/改行）で気持ちよく切る
+        const cut = smartCut(text, max);
+        return cut;
+      }else{
+        // 少ないとき：元テキストから追加で少し継ぎ足すのが本来だが、
+        // デモでは冗長語を少し足して体裁を整える
+        return padTo(text, min);
+      }
+    }
+
+    function smartCut(text, max){
+      if(text.length<=max) return text;
+      const slice = text.slice(0, max);
+      const p = Math.max(slice.lastIndexOf('。'), slice.lastIndexOf('\n'));
+      return (p>0 ? slice.slice(0, p+1) : slice) + (p>0 ? '' : '…');
+    }
+
+    function padTo(text, min){
+      if(text.length>=min) return text;
+      const filler = '\n（要点を凝縮しています。詳細は原文をご確認ください。）';
+      let out = text + filler;
+      if(out.length<min) out = out + ' 追記: 概要の網羅を優先し、細部は省略。';
+      return out;
+    }
+
+    // --- 音声読み上げ（据え置き） ---
+    function speakSummary(){
+      const text = document.getElementById('summary').innerText.trim();
+      if(!text){ alert('要約文がありません'); return; }
+      // 連続押下時に前の発話を止める
+      if(speechSynthesis.speaking) speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'ja-JP';
+      speechSynthesis.speak(utter);
+    }
+
+    // 初期ボタン状態
+    pickPreset(300);
   </script>
 </body>
 </html>
